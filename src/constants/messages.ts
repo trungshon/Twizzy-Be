@@ -1,0 +1,32 @@
+export const USER_MESSAGES = {
+  VALIDATION_ERROR: 'Validation error',
+  NAME_IS_REQUIRED: 'Name is required',
+  NAME_MUST_BE_A_STRING: 'Name must be a string',
+  NAME_MUST_BE_FROM_1_TO_100_CHARACTERS: 'Name must be from 1 to 100 characters',
+  EMAIL_ALREADY_EXISTS: 'Email already exists',
+  EMAIL_IS_REQUIRED: 'Email is required',
+  EMAIL_MUST_BE_A_VALID_EMAIL: 'Email must be a valid email',
+  EMAIL_OR_PASSWORD_IS_INCORRECT: 'Email or password is incorrect',
+  PASSWORD_IS_REQUIRED: 'Password is required',
+  PASSWORD_MUST_BE_A_STRING: 'Password must be a string',
+  PASSWORD_MUST_BE_FROM_6_TO_50_CHARACTERS: 'Password must be from 6 to 50 characters',
+  PASSWORD_MUST_BE_STRONG:
+    'Password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number and one symbol',
+  CONFIRM_PASSWORD_IS_REQUIRED: 'Confirm password is required',
+  CONFIRM_PASSWORD_MUST_BE_A_STRING: 'Confirm password must be a string',
+  CONFIRM_PASSWORD_MUST_BE_FROM_6_TO_50_CHARACTERS: 'Confirm password must be from 6 to 50 characters',
+  CONFIRM_PASSWORD_MUST_BE_STRONG:
+    'Confirm password must be at least 6 characters long and contain at least one uppercase letter, one lowercase letter, one number and one symbol',
+  CONFIRM_PASSWORD_MUST_BE_THE_SAME: 'Confirm password and password must be the same',
+  DATE_OF_BIRTH_IS_REQUIRED: 'Date of birth is required',
+  DATE_OF_BIRTH_MUST_BE_ISO8601: 'Date of birth must be a valid ISO 8601 date',
+  LOGIN_SUCCESSFULLY: 'Login successfully',
+  REGISTER_SUCCESSFULLY: 'Register successfully',
+  AUTHORIZATION_IS_REQUIRED: 'Authorization is required',
+  ACCESS_TOKEN_IS_REQUIRED: 'Access token is required',
+  LOGOUT_SUCCESSFULLY: 'Logout successfully',
+  LOGOUT_FAILED: 'Logout failed',
+  REFRESH_TOKEN_IS_REQUIRED: 'Refresh token is required',
+  REFRESH_TOKEN_IS_INVALID: 'Refresh token is invalid',
+  USED_REFRESH_TOKEN_OR_NOT_EXISTS: 'Used refresh token or not exists'
+} as const
