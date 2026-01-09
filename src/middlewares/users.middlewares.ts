@@ -10,6 +10,7 @@ import { HTTP_STATUS } from '~/constants/httpStatus'
 import { JsonWebTokenError } from 'jsonwebtoken'
 import { capitalize } from 'lodash'
 import { Request } from 'express'
+import { TokenType } from '~/constants/enum'
 
 export const loginValidator = validate(
   checkSchema(

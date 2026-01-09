@@ -71,6 +71,21 @@ class UsersService {
       message: USER_MESSAGES.LOGOUT_SUCCESSFULLY
     }
   }
+
+  async refreshToken(user_id: string, refresh_token: string) {
+    // Xóa refresh token cũ
+    await databaseService.refreshTokens.deleteOne({ token: refresh_token })
+    // Tạo access token và refresh token mới
+    const [access_token, new_refresh_token] = await this.signAccessTokenAndRefreshToken(user_id)
+    // Lưu refresh token mới vào DB
+    await databaseService.refreshTokens.insertOne(
+      new RefreshToken({ token: new_refresh_token, user_id: new ObjectId(user_id) })
+    )
+    return {
+      access_token,
+      refresh_token: new_refresh_token
+    }
+  }
 }
 
 const usersService = new UsersService()
