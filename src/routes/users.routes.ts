@@ -3,13 +3,16 @@ import {
   accessTokenValidator,
   loginValidator,
   registerValidator,
-  refreshTokenValidator
+  refreshTokenValidator,
+  emailVerifyTokenValidator
 } from '../middlewares/users.middlewares'
 import {
   loginController,
   registerController,
   logoutController,
-  refreshTokenController
+  refreshTokenController,
+  verifyEmailController,
+  resendVerifyEmailController
 } from '../controllers/users.controllers'
 import wrapRequestHandler from '~/utils/handlers'
 import { USER_MESSAGES } from '~/constants/messages'
@@ -74,5 +77,28 @@ usersRouter.post('/logout', accessTokenValidator, refreshTokenValidator, wrapReq
  * }
  */
 usersRouter.post('/refresh-token', refreshTokenValidator, wrapRequestHandler(refreshTokenController))
+
+/**
+ * @description Verify email khi người dùng click vào link trong email
+ * @path /users/verify-email
+ * @method POST
+ * @body {
+ *   email_verify_token: string
+ * }
+ * @response {
+
+ * }
+ */
+usersRouter.post('/verify-email', emailVerifyTokenValidator, wrapRequestHandler(verifyEmailController))
+
+/**
+ * @description Resend verify email
+ * @path /users/resend-verify-email
+ * @method POST
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ */
+usersRouter.post('/resend-verify-email', accessTokenValidator, wrapRequestHandler(resendVerifyEmailController))
 
 export default usersRouter
