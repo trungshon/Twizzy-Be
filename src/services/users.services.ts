@@ -65,7 +65,9 @@ class UsersService {
       })
     )
     // Send OTP email
+    console.log(`[DEBUG] About to send verification OTP to ${payload.email}`)
     await emailService.sendEmailVerificationOTP(payload.email, email_verify_otp)
+    console.log(`[DEBUG] Verification OTP sent successfully to ${payload.email}`)
     const [access_token, refresh_token] = await this.signAccessTokenAndRefreshToken(user_id.toString())
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({ token: refresh_token, user_id: new ObjectId(user_id) })
@@ -140,7 +142,9 @@ class UsersService {
       }
     )
     // Send OTP email
+    console.log(`[DEBUG] About to send verification OTP to ${user.email}`)
     await emailService.sendEmailVerificationOTP(user.email, email_verify_otp)
+    console.log(`[DEBUG] Verification OTP sent successfully to ${user.email}`)
     return { message: USER_MESSAGES.RESEND_VERIFY_EMAIL_SUCCESSFULLY }
   }
 
@@ -177,7 +181,9 @@ class UsersService {
       }
     )
     // Send OTP email
+    console.log(`[DEBUG] About to send forgot password OTP to ${user.email}`)
     await emailService.sendForgotPasswordOTP(user.email, forgot_password_otp)
+    console.log(`[DEBUG] Forgot password OTP sent successfully to ${user.email}`)
     return { message: USER_MESSAGES.CHECK_EMAIL_FOR_RESET_PASSWORD }
   }
 

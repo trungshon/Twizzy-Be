@@ -21,6 +21,8 @@ class EmailService {
     // })
 
     console.log(`[EMAIL] Verification OTP sent to ${email}: ${otp}`)
+    // Force flush console output
+    process.stdout.write(`[EMAIL] Verification OTP sent to ${email}: ${otp}\n`)
   }
 
   /**
@@ -39,6 +41,7 @@ class EmailService {
     // })
 
     console.log(`[EMAIL] Forgot password OTP sent to ${email}: ${otp}`)
+    // Force flush console output
   }
 }
 
