@@ -11,6 +11,105 @@ import { JsonWebTokenError } from 'jsonwebtoken'
 import { capitalize } from 'lodash'
 import { Request } from 'express'
 import { TokenType } from '~/constants/enum'
+import { ObjectId } from 'mongodb'
+import { ParamSchema } from 'express-validator/lib/middlewares/schema'
+
+const passwordSchema: ParamSchema = {
+  isString: {
+    errorMessage: USER_MESSAGES.PASSWORD_MUST_BE_A_STRING
+  },
+  notEmpty: {
+    errorMessage: USER_MESSAGES.PASSWORD_IS_REQUIRED
+  },
+  isLength: {
+    options: { min: 6, max: 50 },
+    errorMessage: USER_MESSAGES.PASSWORD_MUST_BE_FROM_6_TO_50_CHARACTERS
+  },
+  isStrongPassword: {
+    errorMessage: USER_MESSAGES.PASSWORD_MUST_BE_STRONG,
+    options: {
+      minLength: 6,
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 1
+    }
+  }
+}
+const confirmPasswordSchema: ParamSchema = {
+  isString: {
+    errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_A_STRING
+  },
+  notEmpty: {
+    errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_IS_REQUIRED
+  },
+  isLength: {
+    options: { min: 6, max: 50 },
+    errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_FROM_6_TO_50_CHARACTERS
+  },
+  isStrongPassword: {
+    errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_STRONG,
+    options: {
+      minLength: 6,
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 1
+    }
+  },
+  custom: {
+    options: (value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error(USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_THE_SAME)
+      }
+      return true
+    }
+  }
+}
+
+const forgotPasswordTokenSchema: ParamSchema = {
+  trim: true,
+  custom: {
+    options: async (value: string, { req }) => {
+      if (!value) {
+        throw new ErrorWithStatus({
+          message: USER_MESSAGES.FORGOT_PASSWORD_TOKEN_IS_REQUIRED,
+          status: HTTP_STATUS.UNAUTHORIZED
+        })
+      }
+      try {
+        const decoded_forgot_password_token = await verifyToken({
+          token: value,
+          secretOrPublicKey: process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN as string
+        })
+        const { user_id } = decoded_forgot_password_token
+        const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+        if (user === null) {
+          throw new ErrorWithStatus({
+            message: USER_MESSAGES.USER_NOT_FOUND,
+            status: HTTP_STATUS.UNAUTHORIZED
+          })
+        }
+        if (user.forgot_password_token !== value) {
+          throw new ErrorWithStatus({
+            message: USER_MESSAGES.FORGOT_PASSWORD_TOKEN_IS_INVALID,
+            status: HTTP_STATUS.UNAUTHORIZED
+          })
+        }
+        req.decoded_forgot_password_token = decoded_forgot_password_token
+      } catch (error) {
+        if (error instanceof JsonWebTokenError) {
+          throw new ErrorWithStatus({
+            message: capitalize(error.message),
+            status: HTTP_STATUS.UNAUTHORIZED
+          })
+        }
+        throw error
+      }
+      return true
+    }
+  }
+}
 
 export const loginValidator = validate(
   checkSchema(
@@ -108,58 +207,8 @@ export const registerValidator = validate(
           }
         }
       },
-      password: {
-        isString: {
-          errorMessage: USER_MESSAGES.PASSWORD_MUST_BE_A_STRING
-        },
-        notEmpty: {
-          errorMessage: USER_MESSAGES.PASSWORD_IS_REQUIRED
-        },
-        isLength: {
-          options: { min: 6, max: 50 },
-          errorMessage: USER_MESSAGES.PASSWORD_MUST_BE_FROM_6_TO_50_CHARACTERS
-        },
-        isStrongPassword: {
-          errorMessage: USER_MESSAGES.PASSWORD_MUST_BE_STRONG,
-          options: {
-            minLength: 6,
-            minLowercase: 1,
-            minUppercase: 1,
-            minNumbers: 1,
-            minSymbols: 1
-          }
-        }
-      },
-      confirm_password: {
-        isString: {
-          errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_A_STRING
-        },
-        notEmpty: {
-          errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_IS_REQUIRED
-        },
-        isLength: {
-          options: { min: 6, max: 50 },
-          errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_FROM_6_TO_50_CHARACTERS
-        },
-        isStrongPassword: {
-          errorMessage: USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_STRONG,
-          options: {
-            minLength: 6,
-            minLowercase: 1,
-            minUppercase: 1,
-            minNumbers: 1,
-            minSymbols: 1
-          }
-        },
-        custom: {
-          options: (value, { req }) => {
-            if (value !== req.body.password) {
-              throw new Error(USER_MESSAGES.CONFIRM_PASSWORD_MUST_BE_THE_SAME)
-            }
-            return true
-          }
-        }
-      },
+      password: passwordSchema,
+      confirm_password: confirmPasswordSchema,
       date_of_birth: {
         isISO8601: {
           errorMessage: USER_MESSAGES.DATE_OF_BIRTH_MUST_BE_ISO8601,
@@ -280,6 +329,53 @@ export const emailVerifyTokenValidator = validate(
           }
         }
       }
+    },
+    ['body']
+  )
+)
+
+export const forgotPasswordValidator = validate(
+  checkSchema(
+    {
+      email: {
+        notEmpty: {
+          errorMessage: USER_MESSAGES.EMAIL_IS_REQUIRED
+        },
+        isEmail: {
+          errorMessage: USER_MESSAGES.EMAIL_MUST_BE_A_VALID_EMAIL
+        },
+        trim: true,
+        custom: {
+          options: async (value, { req }) => {
+            const user = await databaseService.users.findOne({ email: value })
+            if (user === null) {
+              throw new Error(USER_MESSAGES.USER_NOT_FOUND)
+            }
+            req.user = user
+            return true
+          }
+        }
+      }
+    },
+    ['body']
+  )
+)
+
+export const verifyForgotPasswordTokenValidator = validate(
+  checkSchema(
+    {
+      forgot_password_token: forgotPasswordTokenSchema
+    },
+    ['body']
+  )
+)
+
+export const resetPasswordValidator = validate(
+  checkSchema(
+    {
+      forgot_password_token: forgotPasswordTokenSchema,
+      password: passwordSchema,
+      confirm_password: confirmPasswordSchema
     },
     ['body']
   )
