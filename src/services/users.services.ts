@@ -8,6 +8,8 @@ import RefreshToken from '~/models/schemas/RefreshToken.schema'
 import { ObjectId } from 'mongodb'
 import { config } from 'dotenv'
 import { USER_MESSAGES } from '~/constants/messages'
+import { generateOTP, getOTPExpiration } from '~/utils/otp'
+import emailService from './email.services'
 config()
 
 class UsersService {
@@ -49,22 +51,25 @@ class UsersService {
 
   async register(payload: RegisterReqBody) {
     const user_id = new ObjectId()
-    const email_verify_token = await this.signEmailVerifyToken(user_id.toString())
+    const email_verify_otp = generateOTP(6)
+    const email_verify_otp_expires_at = getOTPExpiration(10)
     const hashedPassword = await hashPassword(payload.password)
     await databaseService.users.insertOne(
       new User({
         ...payload,
         _id: user_id,
-        email_verify_token: email_verify_token,
+        email_verify_otp: email_verify_otp,
+        email_verify_otp_expires_at: email_verify_otp_expires_at,
         date_of_birth: new Date(payload.date_of_birth),
         password: hashedPassword
       })
     )
+    // Send OTP email
+    await emailService.sendEmailVerificationOTP(payload.email, email_verify_otp)
     const [access_token, refresh_token] = await this.signAccessTokenAndRefreshToken(user_id.toString())
     await databaseService.refreshTokens.insertOne(
       new RefreshToken({ token: refresh_token, user_id: new ObjectId(user_id) })
     )
-    console.log('email_verify_token', email_verify_token)
     return {
       access_token,
       refresh_token
@@ -99,7 +104,14 @@ class UsersService {
       this.signAccessTokenAndRefreshToken(user_id),
       databaseService.users.updateOne(
         { _id: new ObjectId(user_id) },
-        { $set: { email_verify_token: '', verify: UserVerifyStatus.Verified }, $currentDate: { updated_at: true } }
+        {
+          $set: {
+            email_verify_otp: '',
+            email_verify_otp_expires_at: null,
+            verify: UserVerifyStatus.Verified
+          },
+          $currentDate: { updated_at: true }
+        }
       )
     ])
     const [access_token, refresh_token] = token
@@ -111,12 +123,24 @@ class UsersService {
   }
 
   async resendVerifyEmail(user_id: string) {
-    const email_verify_token = await this.signEmailVerifyToken(user_id)
-    console.log('Resend verify email token', email_verify_token)
+    const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+    if (!user) {
+      throw new Error(USER_MESSAGES.USER_NOT_FOUND)
+    }
+    const email_verify_otp = generateOTP(6)
+    const email_verify_otp_expires_at = getOTPExpiration(10)
     await databaseService.users.updateOne(
       { _id: new ObjectId(user_id) },
-      { $set: { email_verify_token: email_verify_token }, $currentDate: { updated_at: true } }
+      {
+        $set: {
+          email_verify_otp: email_verify_otp,
+          email_verify_otp_expires_at: email_verify_otp_expires_at
+        },
+        $currentDate: { updated_at: true }
+      }
     )
+    // Send OTP email
+    await emailService.sendEmailVerificationOTP(user.email, email_verify_otp)
     return { message: USER_MESSAGES.RESEND_VERIFY_EMAIL_SUCCESSFULLY }
   }
 
@@ -136,13 +160,24 @@ class UsersService {
   }
 
   async forgotPassword(user_id: string) {
-    const forgot_password_token = await this.signForgotPasswordToken(user_id)
+    const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+    if (!user) {
+      throw new Error(USER_MESSAGES.USER_NOT_FOUND)
+    }
+    const forgot_password_otp = generateOTP(6)
+    const forgot_password_otp_expires_at = getOTPExpiration(10)
     await databaseService.users.updateOne(
       { _id: new ObjectId(user_id) },
-      { $set: { forgot_password_token: forgot_password_token }, $currentDate: { updated_at: true } }
+      {
+        $set: {
+          forgot_password_otp: forgot_password_otp,
+          forgot_password_otp_expires_at: forgot_password_otp_expires_at
+        },
+        $currentDate: { updated_at: true }
+      }
     )
-    // Gửi email kèm đường link đến email người dùng
-    console.log('Forgot password token', forgot_password_token)
+    // Send OTP email
+    await emailService.sendForgotPasswordOTP(user.email, forgot_password_otp)
     return { message: USER_MESSAGES.CHECK_EMAIL_FOR_RESET_PASSWORD }
   }
 
@@ -150,9 +185,34 @@ class UsersService {
     const hashedPassword = await hashPassword(password)
     await databaseService.users.updateOne(
       { _id: new ObjectId(user_id) },
-      { $set: { password: hashedPassword, forgot_password_token: '' }, $currentDate: { updated_at: true } }
+      {
+        $set: {
+          password: hashedPassword,
+          forgot_password_otp: '',
+          forgot_password_otp_expires_at: null
+        },
+        $currentDate: { updated_at: true }
+      }
     )
     return { message: USER_MESSAGES.RESET_PASSWORD_SUCCESSFULLY }
+  }
+
+  async getMe(user_id: string) {
+    const user = await databaseService.users.findOne(
+      { _id: new ObjectId(user_id) },
+      {
+        projection: {
+          password: 0,
+          email_verify_token: 0,
+          forgot_password_token: 0,
+          email_verify_otp: 0,
+          forgot_password_otp: 0,
+          email_verify_otp_expires_at: 0,
+          forgot_password_otp_expires_at: 0
+        }
+      }
+    )
+    return user
   }
 }
 

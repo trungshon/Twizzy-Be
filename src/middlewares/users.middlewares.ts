@@ -13,6 +13,7 @@ import { Request } from 'express'
 import { TokenType } from '~/constants/enum'
 import { ObjectId } from 'mongodb'
 import { ParamSchema } from 'express-validator/lib/middlewares/schema'
+import { isOTPExpired } from '~/utils/otp'
 
 const passwordSchema: ParamSchema = {
   isString: {
@@ -67,44 +68,59 @@ const confirmPasswordSchema: ParamSchema = {
   }
 }
 
-const forgotPasswordTokenSchema: ParamSchema = {
+const forgotPasswordOTPSchema: ParamSchema = {
   trim: true,
+  isString: {
+    errorMessage: USER_MESSAGES.OTP_MUST_BE_A_STRING
+  },
+  notEmpty: {
+    errorMessage: USER_MESSAGES.OTP_IS_REQUIRED
+  },
+  isLength: {
+    options: { min: 6, max: 6 },
+    errorMessage: USER_MESSAGES.OTP_MUST_BE_6_DIGITS
+  },
   custom: {
     options: async (value: string, { req }) => {
       if (!value) {
         throw new ErrorWithStatus({
-          message: USER_MESSAGES.FORGOT_PASSWORD_TOKEN_IS_REQUIRED,
+          message: USER_MESSAGES.OTP_IS_REQUIRED,
           status: HTTP_STATUS.UNAUTHORIZED
         })
       }
-      try {
-        const decoded_forgot_password_token = await verifyToken({
-          token: value,
-          secretOrPublicKey: process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN as string
+      // Find user by email from request
+      const email = req.body.email || (req.user as any)?.email
+      if (!email) {
+        throw new ErrorWithStatus({
+          message: USER_MESSAGES.EMAIL_IS_REQUIRED,
+          status: HTTP_STATUS.BAD_REQUEST
         })
-        const { user_id } = decoded_forgot_password_token
-        const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
-        if (user === null) {
-          throw new ErrorWithStatus({
-            message: USER_MESSAGES.USER_NOT_FOUND,
-            status: HTTP_STATUS.UNAUTHORIZED
-          })
-        }
-        if (user.forgot_password_token !== value) {
-          throw new ErrorWithStatus({
-            message: USER_MESSAGES.FORGOT_PASSWORD_TOKEN_IS_INVALID,
-            status: HTTP_STATUS.UNAUTHORIZED
-          })
-        }
-        req.decoded_forgot_password_token = decoded_forgot_password_token
-      } catch (error) {
-        if (error instanceof JsonWebTokenError) {
-          throw new ErrorWithStatus({
-            message: capitalize(error.message),
-            status: HTTP_STATUS.UNAUTHORIZED
-          })
-        }
-        throw error
+      }
+      const user = await databaseService.users.findOne({ email })
+      if (!user) {
+        throw new ErrorWithStatus({
+          message: USER_MESSAGES.USER_NOT_FOUND,
+          status: HTTP_STATUS.NOT_FOUND
+        })
+      }
+      // Check if OTP matches
+      if (user.forgot_password_otp !== value) {
+        throw new ErrorWithStatus({
+          message: USER_MESSAGES.OTP_IS_INVALID,
+          status: HTTP_STATUS.UNAUTHORIZED
+        })
+      }
+      // Check if OTP is expired
+      if (!user.forgot_password_otp_expires_at || isOTPExpired(user.forgot_password_otp_expires_at)) {
+        throw new ErrorWithStatus({
+          message: USER_MESSAGES.OTP_EXPIRED,
+          status: HTTP_STATUS.UNAUTHORIZED
+        })
+      }
+      // Store user_id in request for controller
+      ;(req as Request).decoded_forgot_password_otp = {
+        user_id: user._id?.toString() || '',
+        token_type: TokenType.ForgotPasswordToken
       }
       return true
     }
@@ -300,30 +316,62 @@ export const refreshTokenValidator = validate(
   )
 )
 
-export const emailVerifyTokenValidator = validate(
+export const emailVerifyOTPValidator = validate(
   checkSchema(
     {
-      email_verify_token: {
+      email_verify_otp: {
         trim: true,
+        isString: {
+          errorMessage: USER_MESSAGES.OTP_MUST_BE_A_STRING
+        },
+        notEmpty: {
+          errorMessage: USER_MESSAGES.OTP_IS_REQUIRED
+        },
+        isLength: {
+          options: { min: 6, max: 6 },
+          errorMessage: USER_MESSAGES.OTP_MUST_BE_6_DIGITS
+        },
         custom: {
           options: async (value: string, { req }) => {
             if (!value) {
               throw new ErrorWithStatus({
-                message: USER_MESSAGES.EMAIL_VERIFY_TOKEN_IS_REQUIRED,
+                message: USER_MESSAGES.OTP_IS_REQUIRED,
                 status: HTTP_STATUS.UNAUTHORIZED
               })
             }
-            try {
-              const decoded_email_verify_token = await verifyToken({
-                token: value,
-                secretOrPublicKey: process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN as string
-              })
-              ;(req as Request).decoded_email_verify_token = decoded_email_verify_token
-            } catch (error) {
+            // Find user by email from request (should be set in previous middleware or body)
+            const email = req.body.email || (req.user as any)?.email
+            if (!email) {
               throw new ErrorWithStatus({
-                message: capitalize((error as JsonWebTokenError).message),
+                message: USER_MESSAGES.EMAIL_IS_REQUIRED,
+                status: HTTP_STATUS.BAD_REQUEST
+              })
+            }
+            const user = await databaseService.users.findOne({ email })
+            if (!user) {
+              throw new ErrorWithStatus({
+                message: USER_MESSAGES.USER_NOT_FOUND,
+                status: HTTP_STATUS.NOT_FOUND
+              })
+            }
+            // Check if OTP matches
+            if (user.email_verify_otp !== value) {
+              throw new ErrorWithStatus({
+                message: USER_MESSAGES.OTP_IS_INVALID,
                 status: HTTP_STATUS.UNAUTHORIZED
               })
+            }
+            // Check if OTP is expired
+            if (!user.email_verify_otp_expires_at || isOTPExpired(user.email_verify_otp_expires_at)) {
+              throw new ErrorWithStatus({
+                message: USER_MESSAGES.OTP_EXPIRED,
+                status: HTTP_STATUS.UNAUTHORIZED
+              })
+            }
+            // Store user_id in request for controller
+            ;(req as Request).decoded_email_verify_otp = {
+              user_id: user._id?.toString() || '',
+              token_type: TokenType.EmailVerifyToken
             }
             return true
           }
@@ -361,10 +409,10 @@ export const forgotPasswordValidator = validate(
   )
 )
 
-export const verifyForgotPasswordTokenValidator = validate(
+export const verifyForgotPasswordOTPValidator = validate(
   checkSchema(
     {
-      forgot_password_token: forgotPasswordTokenSchema
+      forgot_password_otp: forgotPasswordOTPSchema
     },
     ['body']
   )
@@ -373,7 +421,7 @@ export const verifyForgotPasswordTokenValidator = validate(
 export const resetPasswordValidator = validate(
   checkSchema(
     {
-      forgot_password_token: forgotPasswordTokenSchema,
+      forgot_password_otp: forgotPasswordOTPSchema,
       password: passwordSchema,
       confirm_password: confirmPasswordSchema
     },

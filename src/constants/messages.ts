@@ -41,5 +41,14 @@ export const USER_MESSAGES = {
   FORGOT_PASSWORD_TOKEN_IS_REQUIRED: 'Forgot password token is required',
   FORGOT_PASSWORD_TOKEN_IS_INVALID: 'Forgot password token is invalid',
   VERIFY_FORGOT_PASSWORD_SUCCESSFULLY: 'Verify forgot password successfully',
-  RESET_PASSWORD_SUCCESSFULLY: 'Reset password successfully'
+  RESET_PASSWORD_SUCCESSFULLY: 'Reset password successfully',
+  GET_ME_SUCCESSFULLY: 'Get my profile successfully',
+  // OTP messages
+  OTP_IS_REQUIRED: 'OTP is required',
+  OTP_MUST_BE_A_STRING: 'OTP must be a string',
+  OTP_MUST_BE_6_DIGITS: 'OTP must be 6 digits',
+  OTP_IS_INVALID: 'OTP is invalid or expired',
+  OTP_EXPIRED: 'OTP has expired',
+  OTP_VERIFY_SUCCESSFULLY: 'OTP verified successfully',
+  OTP_SENT_SUCCESSFULLY: 'OTP sent successfully to your email'
 } as const

@@ -10,7 +10,7 @@ export interface RegisterReqBody {
 }
 
 export interface VerifyEmailReqBody {
-  email_verify_token: string
+  email_verify_otp: string
 }
 
 export interface LogoutReqBody {
@@ -27,11 +27,11 @@ export interface ForgotPasswordReqBody {
 }
 
 export interface VerifyForgotPasswordTokenReqBody {
-  forgot_password_token: string
+  forgot_password_otp: string
 }
 
 export interface ResetPasswordReqBody {
   password: string
   confirm_password: string
-  forgot_password_token: string
+  forgot_password_otp: string
 }

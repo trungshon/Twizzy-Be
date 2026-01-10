@@ -63,16 +63,16 @@ export const verifyEmailController = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { user_id } = req.decoded_email_verify_token as TokenPayload
+  const { user_id } = req.decoded_email_verify_otp as TokenPayload
   const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
-  // Nếu không thấy useruser
+  // Nếu không thấy user
   if (!user) {
     return res.status(HTTP_STATUS.NOT_FOUND).json({
       message: USER_MESSAGES.USER_NOT_FOUND
     })
   }
   // Đã verify, không báo lỗi mà trả về status OK với message là Đã verify trước đó
-  if (user.email_verify_token === '') {
+  if (user.verify === UserVerifyStatus.Verified) {
     return res.status(HTTP_STATUS.OK).json({
       message: USER_MESSAGES.EMAIL_ALREADY_VERIFIED
     })
@@ -127,8 +127,17 @@ export const resetPasswordController = async (
   res: Response,
   next: NextFunction
 ) => {
-  const { user_id } = req.decoded_forgot_password_token as TokenPayload
+  const { user_id } = req.decoded_forgot_password_otp as TokenPayload
   const { password } = req.body
   const result = await usersService.resetPassword(user_id, password)
   return res.json(result)
+}
+
+export const getMeController = async (req: Request, res: Response, next: NextFunction) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const user = await usersService.getMe(user_id)
+  return res.json({
+    message: USER_MESSAGES.GET_ME_SUCCESSFULLY,
+    result: user
+  })
 }
