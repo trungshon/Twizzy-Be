@@ -24,6 +24,8 @@ import databaseService from '~/services/database.services'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { UserVerifyStatus } from '~/constants/enum'
 import { pick } from 'lodash'
+import { config } from 'dotenv'
+config()
 
 export const loginController = async (req: Request, res: Response) => {
   const user = req.user as User
@@ -32,6 +34,35 @@ export const loginController = async (req: Request, res: Response) => {
   return res.json({
     message: USER_MESSAGES.LOGIN_SUCCESSFULLY,
     result
+  })
+}
+
+export const oauthController = async (req: Request, res: Response) => {
+  const { code } = req.query
+  const result = await usersService.oauth(code as string)
+  const urlRedirect = `${process.env.CLIENT_REDIRECT_CALLBACK}?access_token=${result.access_token}&refresh_token=${result.refresh_token}&newUser=${result.newUser}`
+  return res.redirect(urlRedirect)
+  // return res.json({
+  //   message: result.newUser ? USER_MESSAGES.REGISTER_SUCCESSFULLY : USER_MESSAGES.LOGIN_SUCCESSFULLY,
+  //   result: {
+  //     access_token: result.access_token,
+  //     refresh_token: result.refresh_token
+  //   }
+  // })
+}
+
+// OAuth for mobile apps (using Google ID token)
+export const oauthMobileController = async (req: Request, res: Response) => {
+  const { id_token } = req.body
+  const result = await usersService.oauthMobile(id_token as string)
+  return res.json({
+    message: result.newUser ? USER_MESSAGES.REGISTER_SUCCESSFULLY : USER_MESSAGES.GOOGLE_LOGIN_SUCCESSFULLY,
+    result: {
+      access_token: result.access_token,
+      refresh_token: result.refresh_token,
+      newUser: result.newUser,
+      verify: result.verify
+    }
   })
 }
 

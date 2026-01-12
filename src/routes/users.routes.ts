@@ -12,7 +12,8 @@ import {
   updateMeValidator,
   followValidator,
   unfollowValidator,
-  changePasswordValidator
+  changePasswordValidator,
+  googleOAuthMobileValidator
 } from '../middlewares/users.middlewares'
 import {
   loginController,
@@ -29,7 +30,9 @@ import {
   getProfileController,
   followController,
   unfollowController,
-  changePasswordController
+  changePasswordController,
+  oauthController,
+  oauthMobileController
 } from '../controllers/users.controllers'
 import wrapRequestHandler from '~/utils/handlers'
 import { USER_MESSAGES } from '~/constants/messages'
@@ -51,6 +54,32 @@ const usersRouter = Router()
  * }
  */
 usersRouter.post('/login', loginValidator, wrapRequestHandler(loginController))
+
+/**
+ * @description Login with Google (Web - OAuth code flow)
+ * @path /users/oauth/google
+ * @method GET
+ * @query {
+ *   code: string
+ * }
+ */
+usersRouter.get('/oauth/google', wrapRequestHandler(oauthController))
+
+/**
+ * @description Login with Google (Mobile - ID token flow)
+ * @path /users/oauth/google/mobile
+ * @method POST
+ * @body {
+ *   id_token: string
+ * }
+ * @response {
+ *   access_token: string
+ *   refresh_token: string
+ *   newUser: 0 | 1
+ *   verify: UserVerifyStatus
+ * }
+ */
+usersRouter.post('/oauth/google/mobile', googleOAuthMobileValidator, wrapRequestHandler(oauthMobileController))
 
 /**
  * @description Register a user

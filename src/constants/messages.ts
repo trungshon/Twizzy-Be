@@ -1,4 +1,8 @@
 export const USER_MESSAGES = {
+  GMAIL_NOT_VERIFIED: 'Gmail chưa được xác nhận',
+  GOOGLE_ID_TOKEN_IS_REQUIRED: 'Google ID token không được để trống',
+  GOOGLE_ID_TOKEN_IS_INVALID: 'Google ID token không hợp lệ',
+  GOOGLE_LOGIN_SUCCESSFULLY: 'Đăng nhập bằng Google thành công',
   VALIDATION_ERROR: 'Validation error',
   NAME_IS_REQUIRED: 'Tên không được để trống',
   NAME_MUST_BE_A_STRING: 'Tên phải là một chuỗi',

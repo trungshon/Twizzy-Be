@@ -65,3 +65,7 @@ export interface ChangePasswordReqBody {
   password: string
   confirm_password: string
 }
+
+export interface GoogleOAuthMobileReqBody {
+  id_token: string
+}

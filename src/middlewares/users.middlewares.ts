@@ -618,3 +618,21 @@ export const changePasswordValidator = validate(
     ['body']
   )
 )
+
+// Google OAuth Mobile validator (validates ID token from mobile app)
+export const googleOAuthMobileValidator = validate(
+  checkSchema(
+    {
+      id_token: {
+        notEmpty: {
+          errorMessage: USER_MESSAGES.GOOGLE_ID_TOKEN_IS_REQUIRED
+        },
+        isString: {
+          errorMessage: USER_MESSAGES.GOOGLE_ID_TOKEN_IS_INVALID
+        },
+        trim: true
+      }
+    },
+    ['body']
+  )
+)
