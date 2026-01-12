@@ -7,6 +7,7 @@ import {
   RegisterReqBody,
   ResetPasswordReqBody,
   TokenPayload,
+  UpdateMeReqBody,
   VerifyEmailReqBody,
   VerifyForgotPasswordTokenReqBody
 } from '~/models/requests/User.requests'
@@ -18,11 +19,12 @@ import { hashPassword } from '~/utils/crypto'
 import databaseService from '~/services/database.services'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { UserVerifyStatus } from '~/constants/enum'
+import { pick } from 'lodash'
 
 export const loginController = async (req: Request, res: Response) => {
   const user = req.user as User
   const user_id = user._id as ObjectId
-  const result = await usersService.login(user_id.toString())
+  const result = await usersService.login({ user_id: user_id.toString(), verify: user.verify })
   return res.json({
     message: USER_MESSAGES.LOGIN_SUCCESSFULLY,
     result
@@ -49,9 +51,10 @@ export const logoutController = async (req: Request<ParamsDictionary, any, Logou
 
 export const refreshTokenController = async (req: Request, res: Response) => {
   const { decoded_refresh_token } = req
+  const user = req.user as User
   const { refresh_token } = req.body
   const user_id = decoded_refresh_token?.user_id as string
-  const result = await usersService.refreshToken(user_id, refresh_token)
+  const result = await usersService.refreshToken({ user_id, verify: user.verify }, refresh_token)
   return res.json({
     message: USER_MESSAGES.REFRESH_TOKEN_SUCCESSFULLY,
     result
@@ -138,6 +141,21 @@ export const getMeController = async (req: Request, res: Response, next: NextFun
   const user = await usersService.getMe(user_id)
   return res.json({
     message: USER_MESSAGES.GET_ME_SUCCESSFULLY,
+    result: user
+  })
+}
+
+export const updateMeController = async (
+  req: Request<ParamsDictionary, any, UpdateMeReqBody>,
+  res: Response,
+  next: NextFunction
+) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const { body } = req
+  console.log(body)
+  const user = await usersService.updateMe(user_id, body)
+  return res.json({
+    message: USER_MESSAGES.UPDATE_ME_SUCCESSFULLY,
     result: user
   })
 }
