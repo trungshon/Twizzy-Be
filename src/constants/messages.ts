@@ -53,7 +53,9 @@ export const USER_MESSAGES = {
   WEBSITE_MUST_BE_A_STRING: 'Website phải là một chuỗi',
   WEBSITE_MUST_BE_FROM_1_TO_200_CHARACTERS: 'Website phải có từ 1 đến 200 ký tự',
   USERNAME_MUST_BE_A_STRING: 'Username phải là một chuỗi',
-  USERNAME_MUST_BE_FROM_1_TO_50_CHARACTERS: 'Username phải có từ 1 đến 50 ký tự',
+  USERNAME_INVALID:
+    'Username phải có từ 4 đến 15 ký tự và chỉ chứa chữ cái, số, dấu gạch dưới và không được chỉ chứa số',
+  USERNAME_EXISTED: 'Username đã tồn tại',
   IMAGE_URL_MUST_BE_A_STRING: 'Image URL phải là một chuỗi',
   IMAGE_URL_MUST_BE_FROM_1_TO_400_CHARACTERS: 'Image URL phải có từ 1 đến 400 ký tự',
   INVALID_USER_ID: 'ID người dùng không hợp lệ',
@@ -68,5 +70,8 @@ export const USER_MESSAGES = {
   FOLLOW_SUCCESSFULLY: 'Theo dõi người dùng thành công',
   FOLLOWED_ALREADY: 'Đã theo dõi người dùng này',
   ALREADY_UNFOLLOWED: 'Đã hủy theo dõi người dùng này',
-  UNFOLLOW_SUCCESSFULLY: 'Hủy theo dõi người dùng thành công'
+  UNFOLLOW_SUCCESSFULLY: 'Hủy theo dõi người dùng thành công',
+  OLD_PASSWORD_IS_INCORRECT: 'Mật khẩu cũ không chính xác',
+  NEW_PASSWORD_MUST_BE_DIFFERENT: 'Mật khẩu mới phải khác mật khẩu cũ',
+  CHANGE_PASSWORD_SUCCESSFULLY: 'Đổi mật khẩu thành công'
 } as const

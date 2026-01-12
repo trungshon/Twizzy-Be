@@ -15,6 +15,7 @@ import { ObjectId } from 'mongodb'
 import { ParamSchema } from 'express-validator/lib/middlewares/schema'
 import { isOTPExpired } from '~/utils/otp'
 import { TokenPayload } from '~/models/requests/User.requests'
+import { REGEX_USERNAME } from '~/constants/regex'
 
 const nameSchema: ParamSchema = {
   isString: {
@@ -537,9 +538,16 @@ export const updateMeValidator = validate(
           errorMessage: USER_MESSAGES.USERNAME_MUST_BE_A_STRING
         },
         trim: true,
-        isLength: {
-          options: { min: 1, max: 200 },
-          errorMessage: USER_MESSAGES.USERNAME_MUST_BE_FROM_1_TO_50_CHARACTERS
+        custom: {
+          options: async (value: string, { req }) => {
+            if (!REGEX_USERNAME.test(value)) {
+              throw new Error(USER_MESSAGES.USERNAME_INVALID)
+            }
+            const user = await databaseService.users.findOne({ username: value })
+            if (user) {
+              throw new Error(USER_MESSAGES.USERNAME_EXISTED)
+            }
+          }
         }
       },
       avatar: imageUrlSchema,
@@ -564,5 +572,49 @@ export const unfollowValidator = validate(
       user_id: userIdSchema
     },
     ['params']
+  )
+)
+
+export const changePasswordValidator = validate(
+  checkSchema(
+    {
+      old_password: {
+        ...passwordSchema,
+        custom: {
+          options: async (value: string, { req }) => {
+            const { user_id } = req.decoded_authorization as TokenPayload
+            const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+            if (!user) {
+              throw new ErrorWithStatus({
+                message: USER_MESSAGES.USER_NOT_FOUND,
+                status: HTTP_STATUS.NOT_FOUND
+              })
+            }
+            const { password } = user
+            const isMatch = await verifyPassword(value, password)
+            if (!isMatch) {
+              throw new ErrorWithStatus({
+                message: USER_MESSAGES.OLD_PASSWORD_IS_INCORRECT,
+                status: HTTP_STATUS.UNAUTHORIZED
+              })
+            }
+          }
+        }
+      },
+      password: {
+        ...passwordSchema,
+        custom: {
+          options: (value: string, { req }) => {
+            // Check if new password is different from old password
+            if (value === req.body.old_password) {
+              throw new Error(USER_MESSAGES.NEW_PASSWORD_MUST_BE_DIFFERENT)
+            }
+            return true
+          }
+        }
+      },
+      confirm_password: confirmPasswordSchema
+    },
+    ['body']
   )
 )
