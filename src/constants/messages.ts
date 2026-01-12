@@ -44,6 +44,7 @@ export const USER_MESSAGES = {
   RESET_PASSWORD_SUCCESSFULLY: 'Đặt lại mật khẩu thành công',
   GET_ME_SUCCESSFULLY: 'Lấy thông tin cá nhân thành công',
   UPDATE_ME_SUCCESSFULLY: 'Cập nhật thông tin cá nhân thành công',
+  GET_PROFILE_SUCCESSFULLY: 'Lấy thông tin người dùng thành công',
   USER_NOT_VERIFIED: 'Người dùng chưa được xác nhận',
   BIO_MUST_BE_A_STRING: 'Bio phải là một chuỗi',
   BIO_MUST_BE_FROM_1_TO_200_CHARACTERS: 'Bio phải có từ 1 đến 200 ký tự',
@@ -55,6 +56,7 @@ export const USER_MESSAGES = {
   USERNAME_MUST_BE_FROM_1_TO_50_CHARACTERS: 'Username phải có từ 1 đến 50 ký tự',
   IMAGE_URL_MUST_BE_A_STRING: 'Image URL phải là một chuỗi',
   IMAGE_URL_MUST_BE_FROM_1_TO_400_CHARACTERS: 'Image URL phải có từ 1 đến 400 ký tự',
+  INVALID_USER_ID: 'ID người dùng không hợp lệ',
   // OTP messages
   OTP_IS_REQUIRED: 'OTP không được để trống',
   OTP_MUST_BE_A_STRING: 'OTP phải là một chuỗi',
@@ -62,5 +64,9 @@ export const USER_MESSAGES = {
   OTP_IS_INVALID: 'OTP không hợp lệ hoặc đã hết hạn',
   OTP_EXPIRED: 'OTP đã hết hạn',
   OTP_VERIFY_SUCCESSFULLY: 'OTP xác nhận thành công',
-  OTP_SENT_SUCCESSFULLY: 'OTP đã được gửi thành công đến email của bạn'
+  OTP_SENT_SUCCESSFULLY: 'OTP đã được gửi thành công đến email của bạn',
+  FOLLOW_SUCCESSFULLY: 'Theo dõi người dùng thành công',
+  FOLLOWED_ALREADY: 'Đã theo dõi người dùng này',
+  ALREADY_UNFOLLOWED: 'Đã hủy theo dõi người dùng này',
+  UNFOLLOW_SUCCESSFULLY: 'Hủy theo dõi người dùng thành công'
 } as const

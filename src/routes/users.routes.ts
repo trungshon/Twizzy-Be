@@ -9,7 +9,9 @@ import {
   verifyForgotPasswordOTPValidator,
   resetPasswordValidator,
   verifiedUserValidator,
-  updateMeValidator
+  updateMeValidator,
+  followValidator,
+  unfollowValidator
 } from '../middlewares/users.middlewares'
 import {
   loginController,
@@ -22,7 +24,10 @@ import {
   verifyForgotPasswordController,
   resetPasswordController,
   getMeController,
-  updateMeController
+  updateMeController,
+  getProfileController,
+  followController,
+  unfollowController
 } from '../controllers/users.controllers'
 import wrapRequestHandler from '~/utils/handlers'
 import { USER_MESSAGES } from '~/constants/messages'
@@ -187,6 +192,48 @@ usersRouter.patch(
     'cover_photo'
   ]),
   wrapRequestHandler(updateMeController)
+)
+
+/**
+ * @description Get user profile by username
+ * @path /users/:username
+ * @method GET
+ */
+usersRouter.get('/:username', wrapRequestHandler(getProfileController))
+
+/**
+ * @description Follow someone
+ * @path /users/:username
+ * @method POST
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ * @body {
+ *   followed_user_id: string
+ * }
+ */
+usersRouter.post(
+  '/follow',
+  accessTokenValidator,
+  verifiedUserValidator,
+  followValidator,
+  wrapRequestHandler(followController)
+)
+
+/**
+ * @description Unfollow someone
+ * @path /users/follow/user_id
+ * @method DELETE
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ */
+usersRouter.delete(
+  '/follow/:user_id',
+  accessTokenValidator,
+  verifiedUserValidator,
+  unfollowValidator,
+  wrapRequestHandler(unfollowController)
 )
 
 export default usersRouter
