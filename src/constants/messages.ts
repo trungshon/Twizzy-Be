@@ -77,5 +77,7 @@ export const USER_MESSAGES = {
   UNFOLLOW_SUCCESSFULLY: 'Hủy theo dõi người dùng thành công',
   OLD_PASSWORD_IS_INCORRECT: 'Mật khẩu cũ không chính xác',
   NEW_PASSWORD_MUST_BE_DIFFERENT: 'Mật khẩu mới phải khác mật khẩu cũ',
-  CHANGE_PASSWORD_SUCCESSFULLY: 'Đổi mật khẩu thành công'
+  CHANGE_PASSWORD_SUCCESSFULLY: 'Đổi mật khẩu thành công',
+  UPLOAD_IMAGE_SUCCESSFULLY: 'Tải lên ảnh thành công',
+  UPLOAD_VIDEO_SUCCESSFULLY: 'Tải lên video thành công'
 } as const
