@@ -15,3 +15,15 @@ export enum MediaType {
   Image,
   Video
 }
+
+export enum TwizzType {
+  Twizz,
+  Retwizz,
+  Comment,
+  QuoteTwizz
+}
+
+export enum TwizzAudience {
+  Everyone,
+  TwizzCircle
+}

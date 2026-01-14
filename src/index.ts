@@ -6,7 +6,9 @@ import mediasRouter from './routes/medias.routes'
 import { initFolder } from './utils/file'
 import { config } from 'dotenv'
 import staticRouter from './routes/static.routes'
-
+import twizzsRouter from './routes/twizzs.routes'
+import bookmarksRouter from './routes/bookmarks.routes'
+import likesRouter from './routes/likes.routes'
 config()
 databaseService.connect().then(() => {
   databaseService.indexUsers()
@@ -20,6 +22,9 @@ initFolder()
 app.use(express.json())
 app.use('/users', usersRouter)
 app.use('/medias', mediasRouter)
+app.use('/twizzs', twizzsRouter)
+app.use('/bookmarks', bookmarksRouter)
+app.use('/likes', likesRouter)
 app.use('/static', staticRouter)
 // app.use('/static', express.static(UPLOAD_IMAGE_DIR))
 app.use(defaultErrorHandler)

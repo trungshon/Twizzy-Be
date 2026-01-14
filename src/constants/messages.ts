@@ -81,3 +81,33 @@ export const USER_MESSAGES = {
   UPLOAD_IMAGE_SUCCESSFULLY: 'Tải lên ảnh thành công',
   UPLOAD_VIDEO_SUCCESSFULLY: 'Tải lên video thành công'
 } as const
+
+export const TWIZZ_MESSAGES = {
+  INVALID_TWIZZ_ID: 'ID bài viết không hợp lệ',
+  TWIZZ_NOT_EXISTS: 'Bài viết không tồn tại',
+  CREATE_TWIZZ_SUCCESSFULLY: 'Tạo bài viết thành công',
+  CREATE_TWIZZ_FAILED: 'Tạo bài viết thất bại',
+  INVALID_TYPE: 'Loại bài viết không hợp lệ',
+  INVALID_AUDIENCE: 'Đối tượng của bài viết không hợp lệ',
+  INVALID_PARENT_ID: 'ID bài viết cha không hợp lệ',
+  PARENT_ID_MUST_BE_NULL: 'ID bài viết cha phải là null',
+  CONTENT_MUST_BE_A_NON_EMPTY_STRING: 'Nội dung phải là một chuỗi không rỗng',
+  CONTENT_MUST_BE_AN_EMPTY_STRING: 'Nội dung phải là một chuỗi rỗng',
+  HASHTAGS_MUST_BE_AN_ARRAY_OF_STRINGS: 'Hashtags phải là một mảng các chuỗi',
+  MENTIONS_MUST_BE_AN_ARRAY_OF_USER_IDS: 'Mentions phải là một mảng các user_id',
+  MEDIAS_MUST_BE_AN_ARRAY_OF_MEDIA_OBJECTS: 'Medias phải là một mảng các Media Object'
+} as const
+
+export const BOOKMARK_MESSAGES = {
+  BOOKMARK_TWIZZ_SUCCESSFULLY: 'Đánh dấu bài viết thành công',
+  BOOKMARK_TWIZZ_FAILED: 'Đánh dấu bài viết thất bại',
+  UNBOOKMARK_TWIZZ_SUCCESSFULLY: 'Hủy đánh dấu bài viết thành công',
+  UNBOOKMARK_TWIZZ_FAILED: 'Hủy đánh dấu bài viết thất bại'
+} as const
+
+export const LIKE_MESSAGES = {
+  LIKE_TWIZZ_SUCCESSFULLY: 'Thích bài viết thành công',
+  LIKE_TWIZZ_FAILED: 'Thích bài viết thất bại',
+  UNLIKE_TWIZZ_SUCCESSFULLY: 'Hủy thích bài viết thành công',
+  UNLIKE_TWIZZ_FAILED: 'Hủy thích bài viết thất bại'
+} as const
