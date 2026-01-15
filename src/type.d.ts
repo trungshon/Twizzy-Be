@@ -1,6 +1,7 @@
 import { Request } from 'express'
 import User from './models/schemas/User.schema'
 import { TokenPayload } from './models/requests/User.requests'
+import Twizz from './models/schemas/Twizz.schema'
 declare module 'express' {
   interface Request {
     user?: User
@@ -10,5 +11,6 @@ declare module 'express' {
     decoded_forgot_password_token?: TokenPayload
     decoded_email_verify_otp?: TokenPayload
     decoded_forgot_password_otp?: TokenPayload
+    twizz?: Twizz
   }
 }

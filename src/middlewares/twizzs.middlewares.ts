@@ -1,13 +1,16 @@
 import { checkSchema } from 'express-validator'
-import { MediaType, TwizzAudience, TwizzType } from '~/constants/enum'
+import { MediaType, TwizzAudience, TwizzType, UserVerifyStatus } from '~/constants/enum'
 import validate from '~/utils/validation'
 import { numberEnumToArray } from '~/utils/commons'
-import { TWIZZ_MESSAGES } from '~/constants/messages'
+import { TWIZZ_MESSAGES, USER_MESSAGES } from '~/constants/messages'
 import { ObjectId } from 'mongodb'
 import { isEmpty } from 'lodash'
 import databaseService from '~/services/database.services'
 import { ErrorWithStatus } from '~/models/Errors'
 import { HTTP_STATUS } from '~/constants/httpStatus'
+import { NextFunction, Request, Response } from 'express'
+import Twizz from '~/models/schemas/Twizz.schema'
+import wrapRequestHandler from '~/utils/handlers'
 
 const twizzType = numberEnumToArray(TwizzType)
 const twizzAudience = numberEnumToArray(TwizzAudience)
@@ -126,13 +129,129 @@ export const twizzIdValidator = validate(
                 status: HTTP_STATUS.BAD_REQUEST
               })
             }
-            const twizz = await databaseService.twizzs.findOne({ _id: new ObjectId(value) })
+            const [twizz] = await databaseService.twizzs
+              .aggregate<Twizz>([
+                {
+                  $match: {
+                    _id: new ObjectId(value)
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'hashtags',
+                    localField: 'hashtags',
+                    foreignField: '_id',
+                    as: 'hashtags'
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'users',
+                    localField: 'mentions',
+                    foreignField: '_id',
+                    as: 'mentions'
+                  }
+                },
+                {
+                  $addFields: {
+                    mentions: {
+                      $map: {
+                        input: '$mentions',
+                        as: 'mention',
+                        in: {
+                          _id: '$$mention._id',
+                          name: '$$mention.name',
+                          username: '$$mention.username',
+                          email: '$$mention.email'
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'bookmarks',
+                    localField: '_id',
+                    foreignField: 'twizz_id',
+                    as: 'bookmarks'
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'likes',
+                    localField: '_id',
+                    foreignField: 'twizz_id',
+                    as: 'likes'
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'twizzs',
+                    localField: '_id',
+                    foreignField: 'parent_id',
+                    as: 'twizz_children'
+                  }
+                },
+                {
+                  $addFields: {
+                    bookmarks: {
+                      $size: '$bookmarks'
+                    },
+                    likes: {
+                      $size: '$likes'
+                    },
+                    retwizz_count: {
+                      $size: {
+                        $filter: {
+                          input: '$twizz_children',
+                          as: 'item',
+                          cond: {
+                            $eq: ['$$item.type', 1]
+                          }
+                        }
+                      }
+                    },
+                    comment_count: {
+                      $size: {
+                        $filter: {
+                          input: '$twizz_children',
+                          as: 'item',
+                          cond: {
+                            $eq: ['$$item.type', 2]
+                          }
+                        }
+                      }
+                    },
+                    quote_count: {
+                      $size: {
+                        $filter: {
+                          input: '$twizz_children',
+                          as: 'item',
+                          cond: {
+                            $eq: ['$$item.type', 3]
+                          }
+                        }
+                      }
+                    },
+                    view: {
+                      $add: ['$user_views', '$guest_views']
+                    }
+                  }
+                },
+                {
+                  $project: {
+                    twizz_children: 0
+                  }
+                }
+              ])
+              .toArray()
             if (!twizz) {
               throw new ErrorWithStatus({
                 message: TWIZZ_MESSAGES.TWIZZ_NOT_EXISTS,
                 status: HTTP_STATUS.NOT_FOUND
               })
             }
+            ;(req as Request).twizz = twizz
             return true
           }
         }
@@ -141,3 +260,34 @@ export const twizzIdValidator = validate(
     ['params', 'body']
   )
 )
+
+export const audienceValidator = wrapRequestHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const twizz = req.twizz as Twizz
+  if (twizz.audience === TwizzAudience.TwizzCircle) {
+    // Kiểm tra người xem twizz này đã đăng nhập hay chưa
+    if (!req.decoded_authorization) {
+      throw new ErrorWithStatus({
+        message: USER_MESSAGES.ACCESS_TOKEN_IS_REQUIRED,
+        status: HTTP_STATUS.UNAUTHORIZED
+      })
+    }
+    // Kiểm tra tài khoản tác giả có bị khóa hay bị xóa hay chưa
+    const author = await databaseService.users.findOne({ _id: new ObjectId(twizz.user_id) })
+    if (!author || author.verify === UserVerifyStatus.Banned) {
+      throw new ErrorWithStatus({
+        message: USER_MESSAGES.USER_NOT_FOUND,
+        status: HTTP_STATUS.NOT_FOUND
+      })
+    }
+    // Kiểm tra người xem twizz này có thuộc twizz circle của người tác giả hay không
+    const { user_id } = req.decoded_authorization
+    const isInTwizzCircle = author.twizz_circle.some((user_circle_id) => user_circle_id.equals(user_id))
+    if (!isInTwizzCircle && !author._id.equals(user_id)) {
+      throw new ErrorWithStatus({
+        message: TWIZZ_MESSAGES.TWIZZ_IS_NOT_PUBLIC,
+        status: HTTP_STATUS.FORBIDDEN
+      })
+    }
+  }
+  next()
+})

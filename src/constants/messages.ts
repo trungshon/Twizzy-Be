@@ -83,6 +83,8 @@ export const USER_MESSAGES = {
 } as const
 
 export const TWIZZ_MESSAGES = {
+  TWIZZ_IS_NOT_PUBLIC: 'Bài viết không phải là bài viết công khai',
+  GET_TWIZZ_SUCCESSFULLY: 'Lấy bài viết thành công',
   INVALID_TWIZZ_ID: 'ID bài viết không hợp lệ',
   TWIZZ_NOT_EXISTS: 'Bài viết không tồn tại',
   CREATE_TWIZZ_SUCCESSFULLY: 'Tạo bài viết thành công',

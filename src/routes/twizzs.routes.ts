@@ -1,14 +1,14 @@
 import { Router } from 'express'
-import { createTwizzController } from '~/controllers/twizzs.controllers'
-import { accessTokenValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
+import { createTwizzController, getTwizzController } from '~/controllers/twizzs.controllers'
+import { accessTokenValidator, isUserLoggedInValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
-import { createTwizzValidator } from '~/middlewares/twizzs.middlewares'
+import { audienceValidator, createTwizzValidator, twizzIdValidator } from '~/middlewares/twizzs.middlewares'
 
 const twizzsRouter = Router()
 
 /**
  * @description Create a new twizz
- * @path /twizzs
+ * @path /
  * @method POST
  * @body {
  *   type: TwizzType
@@ -26,6 +26,23 @@ twizzsRouter.post(
   verifiedUserValidator,
   createTwizzValidator,
   wrapRequestHandler(createTwizzController)
+)
+
+/**
+ * @description Get twizz detail
+ * @path /:twizz_id
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ */
+twizzsRouter.get(
+  '/:twizz_id',
+  twizzIdValidator,
+  isUserLoggedInValidator(accessTokenValidator),
+  isUserLoggedInValidator(verifiedUserValidator),
+  audienceValidator,
+  wrapRequestHandler(getTwizzController)
 )
 
 export default twizzsRouter

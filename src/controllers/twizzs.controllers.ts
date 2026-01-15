@@ -13,3 +13,10 @@ export const createTwizzController = async (req: Request<ParamsDictionary, any, 
     result
   })
 }
+
+export const getTwizzController = async (req: Request, res: Response) => {
+  return res.json({
+    message: TWIZZ_MESSAGES.GET_TWIZZ_SUCCESSFULLY,
+    result: req.twizz
+  })
+}
