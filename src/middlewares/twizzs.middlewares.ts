@@ -206,7 +206,7 @@ export const twizzIdValidator = validate(
                           input: '$twizz_children',
                           as: 'item',
                           cond: {
-                            $eq: ['$$item.type', 1]
+                            $eq: ['$$item.type', TwizzType.Retwizz]
                           }
                         }
                       }
@@ -217,7 +217,7 @@ export const twizzIdValidator = validate(
                           input: '$twizz_children',
                           as: 'item',
                           cond: {
-                            $eq: ['$$item.type', 2]
+                            $eq: ['$$item.type', TwizzType.Comment]
                           }
                         }
                       }
@@ -228,13 +228,10 @@ export const twizzIdValidator = validate(
                           input: '$twizz_children',
                           as: 'item',
                           cond: {
-                            $eq: ['$$item.type', 3]
+                            $eq: ['$$item.type', TwizzType.QuoteTwizz]
                           }
                         }
                       }
-                    },
-                    view: {
-                      $add: ['$user_views', '$guest_views']
                     }
                   }
                 },
@@ -291,3 +288,49 @@ export const audienceValidator = wrapRequestHandler(async (req: Request, res: Re
   }
   next()
 })
+
+export const getTwizzChildrenValidator = validate(
+  checkSchema(
+    {
+      twizz_type: {
+        isIn: {
+          options: [twizzType],
+          errorMessage: TWIZZ_MESSAGES.INVALID_TWIZZ_TYPE
+        }
+      }
+    },
+    ['query']
+  )
+)
+
+export const paginationValidator = validate(
+  checkSchema(
+    {
+      limit: {
+        isNumeric: true,
+        custom: {
+          options: async (value, { req }) => {
+            const num = Number(value)
+            if (num < 1 || num > 100) {
+              throw new Error(TWIZZ_MESSAGES.LIMIT_MUST_BE_BETWEEN_1_AND_100)
+            }
+            return true
+          }
+        }
+      },
+      page: {
+        isNumeric: true,
+        custom: {
+          options: async (value, { req }) => {
+            const num = Number(value)
+            if (num < 1) {
+              throw new Error(TWIZZ_MESSAGES.PAGE_MUST_BE_AT_LEAST_1)
+            }
+            return true
+          }
+        }
+      }
+    },
+    ['query']
+  )
+)

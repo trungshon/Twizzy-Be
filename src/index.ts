@@ -9,6 +9,8 @@ import staticRouter from './routes/static.routes'
 import twizzsRouter from './routes/twizzs.routes'
 import bookmarksRouter from './routes/bookmarks.routes'
 import likesRouter from './routes/likes.routes'
+// import './utils/fake'
+
 config()
 databaseService.connect().then(() => {
   databaseService.indexUsers()

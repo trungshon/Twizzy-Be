@@ -38,12 +38,14 @@
     "typescript-eslint": "^8.46.2"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.2.0",
     "@types/bcrypt": "^6.0.0",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-validator": "^7.3.0",
+    "faker": "^6.6.6",
     "formidable": "^3.5.4",
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",

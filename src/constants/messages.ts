@@ -83,8 +83,10 @@ export const USER_MESSAGES = {
 } as const
 
 export const TWIZZ_MESSAGES = {
+  GET_NEW_FEEDS_SUCCESSFULLY: 'Lấy new feeds thành công',
   TWIZZ_IS_NOT_PUBLIC: 'Bài viết không phải là bài viết công khai',
   GET_TWIZZ_SUCCESSFULLY: 'Lấy bài viết thành công',
+  GET_TWIZZ_CHILDREN_SUCCESSFULLY: 'Lấy bài viết con thành công',
   INVALID_TWIZZ_ID: 'ID bài viết không hợp lệ',
   TWIZZ_NOT_EXISTS: 'Bài viết không tồn tại',
   CREATE_TWIZZ_SUCCESSFULLY: 'Tạo bài viết thành công',
@@ -97,7 +99,10 @@ export const TWIZZ_MESSAGES = {
   CONTENT_MUST_BE_AN_EMPTY_STRING: 'Nội dung phải là một chuỗi rỗng',
   HASHTAGS_MUST_BE_AN_ARRAY_OF_STRINGS: 'Hashtags phải là một mảng các chuỗi',
   MENTIONS_MUST_BE_AN_ARRAY_OF_USER_IDS: 'Mentions phải là một mảng các user_id',
-  MEDIAS_MUST_BE_AN_ARRAY_OF_MEDIA_OBJECTS: 'Medias phải là một mảng các Media Object'
+  MEDIAS_MUST_BE_AN_ARRAY_OF_MEDIA_OBJECTS: 'Medias phải là một mảng các Media Object',
+  INVALID_TWIZZ_TYPE: 'Loại bài viết không hợp lệ',
+  LIMIT_MUST_BE_BETWEEN_1_AND_100: 'Số lượng bài viết con phải từ 1 đến 100',
+  PAGE_MUST_BE_AT_LEAST_1: 'Trang phải lớn hơn hoặc bằng 1'
 } as const
 
 export const BOOKMARK_MESSAGES = {

@@ -1,8 +1,19 @@
 import { Router } from 'express'
-import { createTwizzController, getTwizzController } from '~/controllers/twizzs.controllers'
+import {
+  createTwizzController,
+  getNewFeedsController,
+  getTwizzChildrenController,
+  getTwizzController
+} from '~/controllers/twizzs.controllers'
 import { accessTokenValidator, isUserLoggedInValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
-import { audienceValidator, createTwizzValidator, twizzIdValidator } from '~/middlewares/twizzs.middlewares'
+import {
+  audienceValidator,
+  createTwizzValidator,
+  getTwizzChildrenValidator,
+  paginationValidator,
+  twizzIdValidator
+} from '~/middlewares/twizzs.middlewares'
 
 const twizzsRouter = Router()
 
@@ -43,6 +54,50 @@ twizzsRouter.get(
   isUserLoggedInValidator(verifiedUserValidator),
   audienceValidator,
   wrapRequestHandler(getTwizzController)
+)
+
+/**
+ * @description Get twizz Children
+ * @path /:twizz_id/children
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ * @query {
+ *   limit: number
+ *   page: number
+ *   twizz_type: TwizzType
+ * }
+ */
+twizzsRouter.get(
+  '/:twizz_id/children',
+  twizzIdValidator,
+  paginationValidator,
+  getTwizzChildrenValidator,
+  isUserLoggedInValidator(accessTokenValidator),
+  isUserLoggedInValidator(verifiedUserValidator),
+  audienceValidator,
+  wrapRequestHandler(getTwizzChildrenController)
+)
+
+/**
+ * @description Get new feeds
+ * @path /
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ * @query {
+ *   limit: number
+ *   page: number
+ * }
+ */
+twizzsRouter.get(
+  '/',
+  paginationValidator,
+  accessTokenValidator,
+  verifiedUserValidator,
+  wrapRequestHandler(getNewFeedsController)
 )
 
 export default twizzsRouter

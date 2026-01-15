@@ -3,6 +3,7 @@ import databaseService from './database.services'
 import Twizz from '~/models/schemas/Twizz.schema'
 import { ObjectId, WithId } from 'mongodb'
 import Hashtag from '~/models/schemas/Hashtag.schema'
+import { TwizzType } from '~/constants/enum'
 
 class TwizzsService {
   async checkAndCreateHashtags(hashtags: string[]) {
@@ -37,6 +38,413 @@ class TwizzsService {
     )
     const twizz = await databaseService.twizzs.findOne({ _id: result.insertedId })
     return twizz
+  }
+
+  async increaseView(twizz_id: string, user_id?: string) {
+    const inc = user_id ? { user_views: 1 } : { guest_views: 1 }
+    const result = await databaseService.twizzs.findOneAndUpdate(
+      { _id: new ObjectId(twizz_id) },
+      { $inc: inc, $currentDate: { updated_at: true } },
+      { returnDocument: 'after', projection: { user_views: 1, guest_views: 1, updated_at: 1 } }
+    )
+    return result as WithId<{ user_views: number; guest_views: number; updated_at: Date }>
+  }
+
+  async getTwizzChildren({
+    twizz_id,
+    twizz_type,
+    limit,
+    page,
+    user_id
+  }: {
+    twizz_id: string
+    twizz_type: TwizzType
+    limit: number
+    page: number
+    user_id?: string
+  }) {
+    const twizzs = await databaseService.twizzs
+      .aggregate<Twizz>([
+        {
+          $match: {
+            parent_id: new ObjectId(twizz_id),
+            type: twizz_type
+          }
+        },
+        {
+          $lookup: {
+            from: 'hashtags',
+            localField: 'hashtags',
+            foreignField: '_id',
+            as: 'hashtags'
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'mentions',
+            foreignField: '_id',
+            as: 'mentions'
+          }
+        },
+        {
+          $addFields: {
+            mentions: {
+              $map: {
+                input: '$mentions',
+                as: 'mention',
+                in: {
+                  _id: '$$mention._id',
+                  name: '$$mention.name',
+                  username: '$$mention.username',
+                  email: '$$mention.email'
+                }
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: 'bookmarks',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'bookmarks'
+          }
+        },
+        {
+          $lookup: {
+            from: 'likes',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'likes'
+          }
+        },
+        {
+          $lookup: {
+            from: 'twizzs',
+            localField: '_id',
+            foreignField: 'parent_id',
+            as: 'twizz_children'
+          }
+        },
+        {
+          $addFields: {
+            bookmarks: {
+              $size: '$bookmarks'
+            },
+            likes: {
+              $size: '$likes'
+            },
+            retwizz_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.Retwizz]
+                  }
+                }
+              }
+            },
+            comment_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.Comment]
+                  }
+                }
+              }
+            },
+            quote_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.QuoteTwizz]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            twizz_children: 0
+          }
+        },
+        {
+          $skip: (page - 1) * limit // Công thức phân trang
+        },
+        {
+          $limit: limit
+        }
+      ])
+      .toArray()
+    const ids = twizzs.map((twizz) => twizz._id as ObjectId)
+    const inc = user_id ? { user_views: 1 } : { guest_views: 1 }
+    const date = new Date()
+    const [, total] = await Promise.all([
+      databaseService.twizzs.updateMany({ _id: { $in: ids } }, { $inc: inc, $set: { updated_at: date } }),
+      databaseService.twizzs.countDocuments({ parent_id: new ObjectId(twizz_id), type: twizz_type })
+    ])
+    twizzs.forEach((twizz) => {
+      twizz.updated_at = date
+      if (user_id) {
+        twizz.user_views = twizz.user_views + 1
+      } else {
+        twizz.guest_views = twizz.guest_views + 1
+      }
+    })
+    return {
+      twizzs,
+      total
+    }
+  }
+
+  async getNewFeeds({ user_id, limit, page }: { user_id: string; limit: number; page: number }) {
+    const user_id_objectId = new ObjectId(user_id)
+    const followed_users_ids = await databaseService.followers
+      .find(
+        {
+          user_id: user_id_objectId
+        },
+        { projection: { followed_user_id: 1, _id: 0 } }
+      )
+      .toArray()
+    const ids = followed_users_ids.map((item) => item.followed_user_id)
+    // Mong muốn newfeeds sẽ lấy luôn cả twizz của mình
+    ids.push(user_id_objectId)
+    const [twizzs, total] = await Promise.all([
+      databaseService.twizzs
+        .aggregate([
+          {
+            $match: {
+              user_id: {
+                $in: ids
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user_id',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $unwind: {
+              path: '$user'
+            }
+          },
+          {
+            $match: {
+              $or: [
+                {
+                  audience: 0
+                },
+                {
+                  $and: [
+                    {
+                      audience: 1
+                    },
+                    {
+                      'user.twizz_circle': {
+                        $in: [user_id_objectId]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            $skip: (page - 1) * limit
+          },
+          {
+            $limit: limit
+          },
+          {
+            $lookup: {
+              from: 'hashtags',
+              localField: 'hashtags',
+              foreignField: '_id',
+              as: 'hashtags'
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions'
+            }
+          },
+          {
+            $addFields: {
+              mentions: {
+                $map: {
+                  input: '$mentions',
+                  as: 'mention',
+                  in: {
+                    _id: '$$mention._id',
+                    name: '$$mention.name',
+                    username: '$$mention.username',
+                    email: '$$mention.email'
+                  }
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'bookmarks',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'bookmarks'
+            }
+          },
+          {
+            $lookup: {
+              from: 'likes',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'likes'
+            }
+          },
+          {
+            $lookup: {
+              from: 'twizzs',
+              localField: '_id',
+              foreignField: 'parent_id',
+              as: 'twizz_children'
+            }
+          },
+          {
+            $addFields: {
+              bookmarks: {
+                $size: '$bookmarks'
+              },
+              likes: {
+                $size: '$likes'
+              },
+              retwizz_count: {
+                $size: {
+                  $filter: {
+                    input: '$twizz_children',
+                    as: 'item',
+                    cond: {
+                      $eq: ['$$item.type', TwizzType.Retwizz]
+                    }
+                  }
+                }
+              },
+              comment_count: {
+                $size: {
+                  $filter: {
+                    input: '$twizz_children',
+                    as: 'item',
+                    cond: {
+                      $eq: ['$$item.type', TwizzType.Comment]
+                    }
+                  }
+                }
+              },
+              quote_count: {
+                $size: {
+                  $filter: {
+                    input: '$twizz_children',
+                    as: 'item',
+                    cond: {
+                      $eq: ['$$item.type', TwizzType.QuoteTwizz]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            $project: {
+              twizz_children: 0,
+              user: {
+                password: 0,
+                email_verify_token: 0,
+                twizz_circle: 0,
+                email_verify_otp: 0,
+                email_verify_otp_expires_at: 0,
+                forgot_password_token: 0,
+                forgot_password_otp: 0,
+                forgot_password_otp_expires_at: 0,
+                date_of_birth: 0
+              }
+            }
+          }
+        ])
+        .toArray(),
+      databaseService.twizzs
+        .aggregate([
+          {
+            $match: {
+              user_id: {
+                $in: ids
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user_id',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $unwind: {
+              path: '$user'
+            }
+          },
+          {
+            $match: {
+              $or: [
+                {
+                  audience: 0
+                },
+                {
+                  $and: [
+                    {
+                      audience: 1
+                    },
+                    {
+                      'user.twizz_circle': {
+                        $in: [user_id_objectId]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ])
+        .toArray()
+    ])
+    const twizz_ids = twizzs.map((twizz) => twizz._id as ObjectId)
+    const date = new Date()
+    await databaseService.twizzs.updateMany(
+      { _id: { $in: twizz_ids } },
+      { $inc: { user_views: 1 }, $set: { updated_at: date } }
+    )
+
+    twizzs.forEach((twizz) => {
+      twizz.updated_at = date
+      twizz.user_views = twizz.user_views + 1
+    })
+    return { twizzs, total: total[0].total }
   }
 }
 
