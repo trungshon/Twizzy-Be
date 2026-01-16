@@ -138,6 +138,19 @@ export const twizzIdValidator = validate(
                 },
                 {
                   $lookup: {
+                    from: 'users',
+                    localField: 'user_id',
+                    foreignField: '_id',
+                    as: 'user'
+                  }
+                },
+                {
+                  $unwind: {
+                    path: '$user'
+                  }
+                },
+                {
+                  $lookup: {
                     from: 'hashtags',
                     localField: 'hashtags',
                     foreignField: '_id',
@@ -237,7 +250,17 @@ export const twizzIdValidator = validate(
                 },
                 {
                   $project: {
-                    twizz_children: 0
+                    twizz_children: 0,
+                    user: {
+                      password: 0,
+                      email_verify_token: 0,
+                      twizz_circle: 0,
+                      email_verify_otp: 0,
+                      email_verify_otp_expires_at: 0,
+                      forgot_password_otp: 0,
+                      forgot_password_otp_expires_at: 0,
+                      date_of_birth: 0
+                    }
                   }
                 }
               ])

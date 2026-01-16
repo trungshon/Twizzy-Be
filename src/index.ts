@@ -9,6 +9,7 @@ import staticRouter from './routes/static.routes'
 import twizzsRouter from './routes/twizzs.routes'
 import bookmarksRouter from './routes/bookmarks.routes'
 import likesRouter from './routes/likes.routes'
+import searchRouter from './routes/search.routes'
 // import './utils/fake'
 
 config()
@@ -16,6 +17,7 @@ databaseService.connect().then(() => {
   databaseService.indexUsers()
   databaseService.indexRefreshTokens()
   databaseService.indexFollowers()
+  databaseService.indexTwizzs()
 })
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -27,6 +29,7 @@ app.use('/medias', mediasRouter)
 app.use('/twizzs', twizzsRouter)
 app.use('/bookmarks', bookmarksRouter)
 app.use('/likes', likesRouter)
+app.use('/search', searchRouter)
 app.use('/static', staticRouter)
 // app.use('/static', express.static(UPLOAD_IMAGE_DIR))
 app.use(defaultErrorHandler)

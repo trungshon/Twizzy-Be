@@ -118,3 +118,12 @@ export const LIKE_MESSAGES = {
   UNLIKE_TWIZZ_SUCCESSFULLY: 'Hủy thích bài viết thành công',
   UNLIKE_TWIZZ_FAILED: 'Hủy thích bài viết thất bại'
 } as const
+
+export const SEARCH_MESSAGES = {
+  SEARCH_SUCCESSFULLY: 'Tìm kiếm thành công',
+  CONTENT_MUST_BE_A_STRING: 'Nội dung tìm kiếm phải là một chuỗi',
+  MEDIA_TYPE_IS_INVALID: 'Loại media không hợp lệ',
+  PEOPLE_FOLLOW_IS_INVALID: 'Tùy chọn người theo dõi không hợp lệ',
+  SEARCH_TYPE_IS_INVALID: 'Loại tìm kiếm không hợp lệ (phải là "users" hoặc "twizzs")',
+  SEARCH_FIELD_IS_INVALID: 'Trường tìm kiếm không hợp lệ (phải là "username" hoặc "name")'
+} as const

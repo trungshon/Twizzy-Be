@@ -16,6 +16,11 @@ export enum MediaType {
   Video
 }
 
+export enum MediaTypeQuery {
+  Image = 'image',
+  Video = 'video'
+}
+
 export enum TwizzType {
   Twizz,
   Retwizz,
@@ -26,4 +31,9 @@ export enum TwizzType {
 export enum TwizzAudience {
   Everyone,
   TwizzCircle
+}
+
+export enum PeopleFollow {
+  Anyone = '0',
+  Following = '1'
 }
