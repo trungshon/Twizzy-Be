@@ -36,8 +36,183 @@ class TwizzsService {
         updated_at: new Date()
       })
     )
-    const twizz = await databaseService.twizzs.findOne({ _id: result.insertedId })
-    return twizz
+    // Populate user info and other data using aggregation
+    const twizzs = await databaseService.twizzs
+      .aggregate([
+        {
+          $match: {
+            _id: result.insertedId
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        {
+          $unwind: {
+            path: '$user'
+          }
+        },
+        {
+          $lookup: {
+            from: 'hashtags',
+            localField: 'hashtags',
+            foreignField: '_id',
+            as: 'hashtags'
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'mentions',
+            foreignField: '_id',
+            as: 'mentions'
+          }
+        },
+        {
+          $addFields: {
+            mentions: {
+              $map: {
+                input: '$mentions',
+                as: 'mention',
+                in: {
+                  _id: '$$mention._id',
+                  name: '$$mention.name',
+                  username: '$$mention.username',
+                  email: '$$mention.email'
+                }
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: 'bookmarks',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'bookmarks'
+          }
+        },
+        {
+          $lookup: {
+            from: 'likes',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'likes'
+          }
+        },
+        {
+          $lookup: {
+            from: 'likes',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'user_likes',
+            pipeline: [
+              {
+                $match: {
+                  user_id: new ObjectId(user_id)
+                }
+              }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'bookmarks',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'user_bookmarks',
+            pipeline: [
+              {
+                $match: {
+                  user_id: new ObjectId(user_id)
+                }
+              }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'twizzs',
+            localField: '_id',
+            foreignField: 'parent_id',
+            as: 'twizz_children'
+          }
+        },
+        {
+          $addFields: {
+            bookmarks: {
+              $size: '$bookmarks'
+            },
+            likes: {
+              $size: '$likes'
+            },
+            is_liked: {
+              $gt: [{ $size: '$user_likes' }, 0]
+            },
+            is_bookmarked: {
+              $gt: [{ $size: '$user_bookmarks' }, 0]
+            },
+            retwizz_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.Retwizz]
+                  }
+                }
+              }
+            },
+            comment_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.Comment]
+                  }
+                }
+              }
+            },
+            quote_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.QuoteTwizz]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            twizz_children: 0,
+            user_likes: 0,
+            user_bookmarks: 0,
+            user: {
+              password: 0,
+              email_verify_token: 0,
+              twizz_circle: 0,
+              email_verify_otp: 0,
+              email_verify_otp_expires_at: 0,
+              forgot_password_token: 0,
+              forgot_password_otp: 0,
+              forgot_password_otp_expires_at: 0,
+              date_of_birth: 0
+            }
+          }
+        }
+      ])
+      .toArray()
+    return twizzs[0]
   }
 
   async increaseView(twizz_id: string, user_id?: string) {
@@ -262,6 +437,9 @@ class TwizzsService {
             }
           },
           {
+            $sort: { created_at: -1 }
+          },
+          {
             $skip: (page - 1) * limit
           },
           {
@@ -324,12 +502,48 @@ class TwizzsService {
             }
           },
           {
+            $lookup: {
+              from: 'likes',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'user_likes',
+              pipeline: [
+                {
+                  $match: {
+                    user_id: user_id_objectId
+                  }
+                }
+              ]
+            }
+          },
+          {
+            $lookup: {
+              from: 'bookmarks',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'user_bookmarks',
+              pipeline: [
+                {
+                  $match: {
+                    user_id: user_id_objectId
+                  }
+                }
+              ]
+            }
+          },
+          {
             $addFields: {
               bookmarks: {
                 $size: '$bookmarks'
               },
               likes: {
                 $size: '$likes'
+              },
+              is_liked: {
+                $gt: [{ $size: '$user_likes' }, 0]
+              },
+              is_bookmarked: {
+                $gt: [{ $size: '$user_bookmarks' }, 0]
               },
               retwizz_count: {
                 $size: {
@@ -369,6 +583,8 @@ class TwizzsService {
           {
             $project: {
               twizz_children: 0,
+              user_likes: 0,
+              user_bookmarks: 0,
               user: {
                 password: 0,
                 email_verify_token: 0,
@@ -445,6 +661,224 @@ class TwizzsService {
       twizz.user_views = twizz.user_views + 1
     })
     return { twizzs, total: total[0].total }
+  }
+
+  async getUserTwizzs({
+    user_id,
+    viewer_user_id,
+    type,
+    limit,
+    page
+  }: {
+    user_id: string
+    viewer_user_id?: string
+    type?: TwizzType
+    limit: number
+    page: number
+  }) {
+    const user_id_objectId = new ObjectId(user_id)
+    const viewer_user_id_objectId = viewer_user_id ? new ObjectId(viewer_user_id) : null
+
+    // Build match condition
+    const matchCondition: any = {
+      user_id: user_id_objectId,
+      parent_id: null // Only get top-level twizzs
+    }
+    if (type !== undefined) {
+      matchCondition.type = type
+    }
+
+    const [twizzs, total] = await Promise.all([
+      databaseService.twizzs
+        .aggregate([
+          {
+            $match: matchCondition
+          },
+          {
+            $sort: { created_at: -1 }
+          },
+          {
+            $skip: (page - 1) * limit
+          },
+          {
+            $limit: limit
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user_id',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $unwind: {
+              path: '$user'
+            }
+          },
+          {
+            $lookup: {
+              from: 'hashtags',
+              localField: 'hashtags',
+              foreignField: '_id',
+              as: 'hashtags'
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions'
+            }
+          },
+          {
+            $addFields: {
+              mentions: {
+                $map: {
+                  input: '$mentions',
+                  as: 'mention',
+                  in: {
+                    _id: '$$mention._id',
+                    name: '$$mention.name',
+                    username: '$$mention.username',
+                    email: '$$mention.email'
+                  }
+                }
+              }
+            }
+          },
+          {
+            $lookup: {
+              from: 'bookmarks',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'bookmarks'
+            }
+          },
+          {
+            $lookup: {
+              from: 'likes',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'likes'
+            }
+          },
+          {
+            $lookup: {
+              from: 'twizzs',
+              localField: '_id',
+              foreignField: 'parent_id',
+              as: 'twizz_children'
+            }
+          },
+          {
+            $lookup: {
+              from: 'likes',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'user_likes',
+              pipeline: viewer_user_id_objectId
+                ? [
+                    {
+                      $match: {
+                        user_id: viewer_user_id_objectId
+                      }
+                    }
+                  ]
+                : []
+            }
+          },
+          {
+            $lookup: {
+              from: 'bookmarks',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'user_bookmarks',
+              pipeline: viewer_user_id_objectId
+                ? [
+                    {
+                      $match: {
+                        user_id: viewer_user_id_objectId
+                      }
+                    }
+                  ]
+                : []
+            }
+          },
+          {
+            $addFields: {
+              bookmarks: {
+                $size: '$bookmarks'
+              },
+              likes: {
+                $size: '$likes'
+              },
+              is_liked: {
+                $gt: [{ $size: '$user_likes' }, 0]
+              },
+              is_bookmarked: {
+                $gt: [{ $size: '$user_bookmarks' }, 0]
+              },
+              retwizz_count: {
+                $size: {
+                  $filter: {
+                    input: '$twizz_children',
+                    as: 'item',
+                    cond: {
+                      $eq: ['$$item.type', TwizzType.Retwizz]
+                    }
+                  }
+                }
+              },
+              comment_count: {
+                $size: {
+                  $filter: {
+                    input: '$twizz_children',
+                    as: 'item',
+                    cond: {
+                      $eq: ['$$item.type', TwizzType.Comment]
+                    }
+                  }
+                }
+              },
+              quote_count: {
+                $size: {
+                  $filter: {
+                    input: '$twizz_children',
+                    as: 'item',
+                    cond: {
+                      $eq: ['$$item.type', TwizzType.QuoteTwizz]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            $project: {
+              twizz_children: 0,
+              user_likes: 0,
+              user_bookmarks: 0,
+              user: {
+                password: 0,
+                email_verify_token: 0,
+                twizz_circle: 0,
+                email_verify_otp: 0,
+                email_verify_otp_expires_at: 0,
+                forgot_password_token: 0,
+                forgot_password_otp: 0,
+                forgot_password_otp_expires_at: 0,
+                date_of_birth: 0
+              }
+            }
+          }
+        ])
+        .toArray(),
+      databaseService.twizzs.countDocuments(matchCondition)
+    ])
+
+    return { twizzs, total }
   }
 }
 

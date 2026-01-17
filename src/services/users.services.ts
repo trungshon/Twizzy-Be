@@ -422,7 +422,23 @@ class UsersService {
         }
       }
     )
-    return user
+    if (!user) return null
+
+    // Count followers (người theo dõi tôi)
+    const followersCount = await databaseService.followers.countDocuments({
+      followed_user_id: new ObjectId(user_id)
+    })
+
+    // Count following (tôi đang theo dõi)
+    const followingCount = await databaseService.followers.countDocuments({
+      user_id: new ObjectId(user_id)
+    })
+
+    return {
+      ...user,
+      followers_count: followersCount,
+      following_count: followingCount
+    }
   }
 
   async getProfileByUsername(username: string) {

@@ -3,7 +3,8 @@ import {
   createTwizzController,
   getNewFeedsController,
   getTwizzChildrenController,
-  getTwizzController
+  getTwizzController,
+  getUserTwizzsController
 } from '~/controllers/twizzs.controllers'
 import { accessTokenValidator, isUserLoggedInValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
@@ -98,6 +99,27 @@ twizzsRouter.get(
   accessTokenValidator,
   verifiedUserValidator,
   wrapRequestHandler(getNewFeedsController)
+)
+
+/**
+ * @description Get user's twizzs by type
+ * @path /users/:user_id/twizzs
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ * @query {
+ *   limit: number
+ *   page: number
+ *   type?: TwizzType (0=Twizz, 1=Retwizz, 3=QuoteTwizz)
+ * }
+ */
+twizzsRouter.get(
+  '/users/:user_id/twizzs',
+  paginationValidator,
+  isUserLoggedInValidator(accessTokenValidator),
+  isUserLoggedInValidator(verifiedUserValidator),
+  wrapRequestHandler(getUserTwizzsController)
 )
 
 export default twizzsRouter

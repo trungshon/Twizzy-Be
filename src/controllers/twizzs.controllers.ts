@@ -65,7 +65,35 @@ export const getNewFeedsController = async (req: Request<ParamsDictionary, any, 
   })
   return res.json({
     message: TWIZZ_MESSAGES.GET_NEW_FEEDS_SUCCESSFULLY,
-    result: { 
+    result: {
+      twizzs: result.twizzs,
+      limit,
+      page,
+      total_page: Math.ceil(result.total / limit)
+    }
+  })
+}
+
+export const getUserTwizzsController = async (
+  req: Request<{ user_id: string }, any, any, Pagination & { type?: string }>,
+  res: Response
+) => {
+  const user_id = req.params.user_id
+  const viewer_user_id = req.decoded_authorization?.user_id
+  const limit = Number(req.query.limit)
+  const page = Number(req.query.page)
+  const type = req.query.type !== undefined ? (Number(req.query.type) as TwizzType) : undefined
+
+  const result = await twizzsService.getUserTwizzs({
+    user_id,
+    viewer_user_id,
+    type,
+    limit,
+    page
+  })
+  return res.json({
+    message: TWIZZ_MESSAGES.GET_TWIZZ_SUCCESSFULLY,
+    result: {
       twizzs: result.twizzs,
       limit,
       page,

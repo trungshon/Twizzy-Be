@@ -1,9 +1,13 @@
 import { Router } from 'express'
-import { accessTokenValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
+import { accessTokenValidator, verifiedUserValidator, isUserLoggedInValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
-import { likeTwizzController } from '~/controllers/likes.controllers'
-import { unlikeTwizzController } from '~/controllers/likes.controllers'
+import {
+  likeTwizzController,
+  unlikeTwizzController,
+  getUserLikedTwizzsController
+} from '~/controllers/likes.controllers'
 import { twizzIdValidator } from '~/middlewares/twizzs.middlewares'
+import { paginationValidator } from '~/middlewares/twizzs.middlewares'
 
 const likesRouter = Router()
 
@@ -40,5 +44,25 @@ likesRouter.delete(
   verifiedUserValidator,
   twizzIdValidator,
   wrapRequestHandler(unlikeTwizzController)
+)
+
+/**
+ * @description Get user's liked twizzs
+ * @path /users/:user_id/liked-twizzs
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ * @query {
+ *   limit: number
+ *   page: number
+ * }
+ */
+likesRouter.get(
+  '/users/:user_id/liked-twizzs',
+  paginationValidator,
+  isUserLoggedInValidator(accessTokenValidator),
+  isUserLoggedInValidator(verifiedUserValidator),
+  wrapRequestHandler(getUserLikedTwizzsController)
 )
 export default likesRouter

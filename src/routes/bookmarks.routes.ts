@@ -1,8 +1,8 @@
 import { Router } from 'express'
-import { bookmarkTwizzController, unbookmarkTwizzController } from '~/controllers/bookmarks.controllers'
-import { accessTokenValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
+import { bookmarkTwizzController, unbookmarkTwizzController, getUserBookmarkedTwizzsController } from '~/controllers/bookmarks.controllers'
+import { accessTokenValidator, verifiedUserValidator, isUserLoggedInValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
-import { twizzIdValidator } from '~/middlewares/twizzs.middlewares'
+import { twizzIdValidator, paginationValidator } from '~/middlewares/twizzs.middlewares'
 import { audienceValidator } from '~/middlewares/twizzs.middlewares'
 
 const bookmarksRouter = Router()
@@ -40,5 +40,25 @@ bookmarksRouter.delete(
   verifiedUserValidator,
   twizzIdValidator,
   wrapRequestHandler(unbookmarkTwizzController)
+)
+
+/**
+ * @description Get user's bookmarked twizzs
+ * @path /users/:user_id/bookmarked-twizzs
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ * @query {
+ *   limit: number
+ *   page: number
+ * }
+ */
+bookmarksRouter.get(
+  '/users/:user_id/bookmarked-twizzs',
+  paginationValidator,
+  isUserLoggedInValidator(accessTokenValidator),
+  isUserLoggedInValidator(verifiedUserValidator),
+  wrapRequestHandler(getUserBookmarkedTwizzsController)
 )
 export default bookmarksRouter
