@@ -4,7 +4,8 @@ import {
   getNewFeedsController,
   getTwizzChildrenController,
   getTwizzController,
-  getUserTwizzsController
+  getUserTwizzsController,
+  deleteTwizzController
 } from '~/controllers/twizzs.controllers'
 import { accessTokenValidator, isUserLoggedInValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
@@ -120,6 +121,23 @@ twizzsRouter.get(
   isUserLoggedInValidator(accessTokenValidator),
   isUserLoggedInValidator(verifiedUserValidator),
   wrapRequestHandler(getUserTwizzsController)
+)
+
+/**
+ * @description Delete a twizz
+ * @path /:twizz_id
+ * @method DELETE
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ */
+twizzsRouter.delete(
+  '/:twizz_id',
+  twizzIdValidator,
+  accessTokenValidator,
+  verifiedUserValidator,
+  audienceValidator,
+  wrapRequestHandler(deleteTwizzController)
 )
 
 export default twizzsRouter

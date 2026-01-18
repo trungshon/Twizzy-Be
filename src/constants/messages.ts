@@ -79,7 +79,9 @@ export const USER_MESSAGES = {
   NEW_PASSWORD_MUST_BE_DIFFERENT: 'Mật khẩu mới phải khác mật khẩu cũ',
   CHANGE_PASSWORD_SUCCESSFULLY: 'Đổi mật khẩu thành công',
   UPLOAD_IMAGE_SUCCESSFULLY: 'Tải lên ảnh thành công',
-  UPLOAD_VIDEO_SUCCESSFULLY: 'Tải lên video thành công'
+  UPLOAD_VIDEO_SUCCESSFULLY: 'Tải lên video thành công',
+  GET_FOLLOWERS_SUCCESSFULLY: 'Lấy danh sách người theo dõi thành công',
+  GET_FOLLOWING_SUCCESSFULLY: 'Lấy danh sách đang theo dõi thành công'
 } as const
 
 export const TWIZZ_MESSAGES = {
@@ -91,6 +93,9 @@ export const TWIZZ_MESSAGES = {
   TWIZZ_NOT_EXISTS: 'Bài viết không tồn tại',
   CREATE_TWIZZ_SUCCESSFULLY: 'Tạo bài viết thành công',
   CREATE_TWIZZ_FAILED: 'Tạo bài viết thất bại',
+  DELETE_TWIZZ_SUCCESSFULLY: 'Xóa bài viết thành công',
+  DELETE_TWIZZ_FAILED: 'Xóa bài viết thất bại',
+  CANNOT_DELETE_TWIZZ: 'Bạn chỉ có thể xóa bài viết của chính mình',
   INVALID_TYPE: 'Loại bài viết không hợp lệ',
   INVALID_AUDIENCE: 'Đối tượng của bài viết không hợp lệ',
   INVALID_PARENT_ID: 'ID bài viết cha không hợp lệ',

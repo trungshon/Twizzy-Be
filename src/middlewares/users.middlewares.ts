@@ -544,7 +544,8 @@ export const updateMeValidator = validate(
               throw new Error(USER_MESSAGES.USERNAME_INVALID)
             }
             const user = await databaseService.users.findOne({ username: value })
-            if (user) {
+            // Nếu username đã tồn tại và không phải của chính user đang update thì báo lỗi
+            if (user && user._id.toString() !== (req as any).decoded_authorization.user_id) {
               throw new Error(USER_MESSAGES.USERNAME_EXISTED)
             }
           }

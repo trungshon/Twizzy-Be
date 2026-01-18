@@ -32,7 +32,9 @@ import {
   unfollowController,
   changePasswordController,
   oauthController,
-  oauthMobileController
+  oauthMobileController,
+  getFollowersController,
+  getFollowingController
 } from '../controllers/users.controllers'
 import wrapRequestHandler from '~/utils/handlers'
 import { USER_MESSAGES } from '~/constants/messages'
@@ -226,11 +228,34 @@ usersRouter.patch(
 )
 
 /**
+ * @description Get followers list
+ * @path /users/:user_id/followers
+ * @method GET
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ */
+usersRouter.get('/:user_id/followers', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(getFollowersController))
+
+/**
+ * @description Get following list
+ * @path /users/:user_id/following
+ * @method GET
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ */
+usersRouter.get('/:user_id/following', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(getFollowingController))
+
+/**
  * @description Get user profile by username
  * @path /users/:username
  * @method GET
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
  */
-usersRouter.get('/:username', wrapRequestHandler(getProfileController))
+usersRouter.get('/:username', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(getProfileController))
 
 /**
  * @description Follow someone

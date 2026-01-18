@@ -259,6 +259,7 @@ export const twizzIdValidator = validate(
                       email_verify_otp_expires_at: 0,
                       forgot_password_otp: 0,
                       forgot_password_otp_expires_at: 0,
+                      forgot_password_token: 0,
                       date_of_birth: 0
                     }
                   }

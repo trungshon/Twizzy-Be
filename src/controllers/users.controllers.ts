@@ -202,7 +202,8 @@ export const getProfileController = async (
   next: NextFunction
 ) => {
   const { username } = req.params
-  const user = await usersService.getProfileByUsername(username)
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const user = await usersService.getProfileByUsername(username, user_id)
   if (!user) {
     return res.status(HTTP_STATUS.NOT_FOUND).json({
       message: USER_MESSAGES.USER_NOT_FOUND
@@ -245,4 +246,36 @@ export const changePasswordController = async (
   const { password } = req.body
   const result = await usersService.changePassword(user_id, password)
   return res.json(result)
+}
+
+export const getFollowersController = async (req: Request, res: Response, next: NextFunction) => {
+  const { user_id } = req.params
+  const { limit, page } = req.query
+  const { user_id: current_user_id } = req.decoded_authorization as TokenPayload
+  const result = await usersService.getFollowers({
+    user_id,
+    limit: Number(limit) || 10,
+    page: Number(page) || 1,
+    current_user_id
+  })
+  return res.json({
+    message: USER_MESSAGES.GET_FOLLOWERS_SUCCESSFULLY,
+    result
+  })
+}
+
+export const getFollowingController = async (req: Request, res: Response, next: NextFunction) => {
+  const { user_id } = req.params
+  const { limit, page } = req.query
+  const { user_id: current_user_id } = req.decoded_authorization as TokenPayload
+  const result = await usersService.getFollowing({
+    user_id,
+    limit: Number(limit) || 10,
+    page: Number(page) || 1,
+    current_user_id
+  })
+  return res.json({
+    message: USER_MESSAGES.GET_FOLLOWING_SUCCESSFULLY,
+    result
+  })
 }

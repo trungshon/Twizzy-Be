@@ -1,5 +1,9 @@
 import { Router } from 'express'
-import { bookmarkTwizzController, unbookmarkTwizzController, getUserBookmarkedTwizzsController } from '~/controllers/bookmarks.controllers'
+import {
+  bookmarkTwizzController,
+  unbookmarkTwizzController,
+  getUserBookmarkedTwizzsController
+} from '~/controllers/bookmarks.controllers'
 import { accessTokenValidator, verifiedUserValidator, isUserLoggedInValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
 import { twizzIdValidator, paginationValidator } from '~/middlewares/twizzs.middlewares'

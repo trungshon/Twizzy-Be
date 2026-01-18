@@ -441,7 +441,7 @@ class UsersService {
     }
   }
 
-  async getProfileByUsername(username: string) {
+  async getProfileByUsername(username: string, current_user_id: string) {
     const user = await databaseService.users.findOne(
       { username },
       {
@@ -457,7 +457,28 @@ class UsersService {
         }
       }
     )
-    return user
+
+    if (!user) return null
+
+    const is_following = await databaseService.followers.findOne({
+      user_id: new ObjectId(current_user_id),
+      followed_user_id: user._id
+    })
+
+    const followersCount = await databaseService.followers.countDocuments({
+        followed_user_id: user._id
+    })
+
+    const followingCount = await databaseService.followers.countDocuments({
+      user_id: user._id
+    })
+
+    return {
+      ...user,
+      is_following: Boolean(is_following),
+      followers_count: followersCount,
+      following_count: followingCount
+    }
   }
 
   async updateMe(user_id: string, payload: UpdateMeReqBody) {
@@ -521,6 +542,174 @@ class UsersService {
       { $set: { password: hashedPassword }, $currentDate: { updated_at: true } }
     )
     return { message: USER_MESSAGES.CHANGE_PASSWORD_SUCCESSFULLY }
+  }
+
+  async getFollowers({
+    user_id,
+    limit,
+    page,
+    current_user_id
+  }: {
+    user_id: string
+    limit: number
+    page: number
+    current_user_id: string
+  }) {
+    const followers = await databaseService.followers
+      .aggregate([
+        {
+          $match: {
+            followed_user_id: new ObjectId(user_id),
+            user_id: { $ne: new ObjectId(current_user_id) }
+          }
+        },
+        {
+          $skip: (page - 1) * limit
+        },
+        {
+          $limit: limit
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        {
+          $unwind: '$user'
+        },
+        {
+          $lookup: {
+            from: 'followers',
+            let: { user_id: '$user._id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$user_id', new ObjectId(current_user_id)] },
+                      { $eq: ['$followed_user_id', '$$user_id'] }
+                    ]
+                  }
+                }
+              }
+            ],
+            as: 'is_following'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            user: {
+              _id: 1,
+              name: 1,
+              username: 1,
+              avatar: 1,
+              bio: 1,
+              verify: 1
+            },
+            is_following: {
+              $gt: [{ $size: '$is_following' }, 0]
+            }
+          }
+        },
+        {
+          $addFields: {
+            'user.is_following': '$is_following'
+          }
+        },
+        {
+          $replaceRoot: { newRoot: '$user' }
+        }
+      ])
+      .toArray()
+    return followers
+  }
+
+  async getFollowing({
+    user_id,
+    limit,
+    page,
+    current_user_id
+  }: {
+    user_id: string
+    limit: number
+    page: number
+    current_user_id: string
+  }) {
+    const following = await databaseService.followers
+      .aggregate([
+        {
+          $match: {
+            user_id: new ObjectId(user_id),
+            followed_user_id: { $ne: new ObjectId(current_user_id) }
+          }
+        },
+        {
+          $skip: (page - 1) * limit
+        },
+        {
+          $limit: limit
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'followed_user_id',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        {
+          $unwind: '$user'
+        },
+        {
+          $lookup: {
+            from: 'followers',
+            let: { user_id: '$user._id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ['$user_id', new ObjectId(current_user_id)] },
+                      { $eq: ['$followed_user_id', '$$user_id'] }
+                    ]
+                  }
+                }
+              }
+            ],
+            as: 'is_following'
+          }
+        },
+        {
+          $project: {
+            _id: 0,
+            user: {
+              _id: 1,
+              name: 1,
+              username: 1,
+              avatar: 1,
+              bio: 1,
+              verify: 1
+            },
+            is_following: {
+              $gt: [{ $size: '$is_following' }, 0]
+            }
+          }
+        },
+        {
+          $addFields: {
+            'user.is_following': '$is_following'
+          }
+        },
+        {
+          $replaceRoot: { newRoot: '$user' }
+        }
+      ])
+      .toArray()
+    return following
   }
 }
 
