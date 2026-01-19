@@ -23,19 +23,7 @@ class TwizzsService {
     return hashtagDocuments.map((hashtag) => (hashtag as WithId<Hashtag>)._id)
   }
   async createTwizz(user_id: string, body: TwizzReqBody) {
-    if (body.type === TwizzType.Retwizz && body.parent_id) {
-      const existingRetwizz = await databaseService.twizzs.findOne({
-        user_id: new ObjectId(user_id),
-        parent_id: new ObjectId(body.parent_id),
-        type: TwizzType.Retwizz
-      })
-      if (existingRetwizz) {
-        throw new ErrorWithStatus({
-          message: 'Bạn đã đăng lại bài viết này rồi',
-          status: HTTP_STATUS.UNPROCESSABLE_ENTITY
-        })
-      }
-    }
+
 
     const hashtags = await this.checkAndCreateHashtags(body.hashtags)
     const result = await databaseService.twizzs.insertOne(
@@ -160,6 +148,52 @@ class TwizzsService {
             as: 'twizz_children'
           }
         },
+        // Lookup parent twizz for quote/comment
+        {
+          $lookup: {
+            from: 'twizzs',
+            localField: 'parent_id',
+            foreignField: '_id',
+            pipeline: [
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'user_id',
+                  foreignField: '_id',
+                  as: 'user'
+                }
+              },
+              {
+                $unwind: {
+                  path: '$user',
+                  preserveNullAndEmptyArrays: true
+                }
+              },
+              {
+                $project: {
+                  user: {
+                    password: 0,
+                    email_verify_token: 0,
+                    twizz_circle: 0,
+                    email_verify_otp: 0,
+                    email_verify_otp_expires_at: 0,
+                    forgot_password_token: 0,
+                    forgot_password_otp: 0,
+                    forgot_password_otp_expires_at: 0,
+                    date_of_birth: 0
+                  }
+                }
+              }
+            ],
+            as: 'parent_twizz'
+          }
+        },
+        {
+          $unwind: {
+            path: '$parent_twizz',
+            preserveNullAndEmptyArrays: true
+          }
+        },
         {
           $addFields: {
             bookmarks: {
@@ -174,17 +208,7 @@ class TwizzsService {
             is_bookmarked: {
               $gt: [{ $size: '$user_bookmarks' }, 0]
             },
-            retwizz_count: {
-              $size: {
-                $filter: {
-                  input: '$twizz_children',
-                  as: 'item',
-                  cond: {
-                    $eq: ['$$item.type', TwizzType.Retwizz]
-                  }
-                }
-              }
-            },
+
             comment_count: {
               $size: {
                 $filter: {
@@ -255,6 +279,7 @@ class TwizzsService {
     page: number
     user_id?: string
   }) {
+    const user_id_objectId = user_id ? new ObjectId(user_id) : null
     const twizzs = await databaseService.twizzs
       .aggregate<Twizz>([
         {
@@ -262,6 +287,56 @@ class TwizzsService {
             parent_id: new ObjectId(twizz_id),
             type: twizz_type
           }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            pipeline: [
+              {
+                $lookup: {
+                  from: 'followers',
+                  let: { author_id: '$_id' },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: {
+                          $and: [
+                            { $eq: ['$user_id', user_id_objectId] },
+                            { $eq: ['$followed_user_id', '$$author_id'] }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  as: 'is_following'
+                }
+              },
+              {
+                $addFields: {
+                  is_following: { $gt: [{ $size: '$is_following' }, 0] }
+                }
+              },
+              {
+                $project: {
+                  password: 0,
+                  email_verify_token: 0,
+                  twizz_circle: 0,
+                  email_verify_otp: 0,
+                  email_verify_otp_expires_at: 0,
+                  forgot_password_token: 0,
+                  forgot_password_otp: 0,
+                  forgot_password_otp_expires_at: 0,
+                  date_of_birth: 0
+                }
+              }
+            ],
+            as: 'user'
+          }
+        },
+        {
+          $unwind: '$user'
         },
         {
           $lookup: {
@@ -319,6 +394,138 @@ class TwizzsService {
             as: 'twizz_children'
           }
         },
+        // Lookup parent twizz for quote/comment
+        {
+          $lookup: {
+            from: 'twizzs',
+            localField: 'parent_id',
+            foreignField: '_id',
+            as: 'parent_twizz',
+            pipeline: [
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'user_id',
+                  foreignField: '_id',
+                  as: 'user'
+                }
+              },
+              {
+                $unwind: {
+                  path: '$user',
+                  preserveNullAndEmptyArrays: true
+                }
+              },
+              {
+                $lookup: {
+                  from: 'hashtags',
+                  localField: 'hashtags',
+                  foreignField: '_id',
+                  as: 'hashtags'
+                }
+              },
+              {
+                $lookup: {
+                  from: 'bookmarks',
+                  localField: '_id',
+                  foreignField: 'twizz_id',
+                  as: 'bookmarks'
+                }
+              },
+              {
+                $lookup: {
+                  from: 'likes',
+                  localField: '_id',
+                  foreignField: 'twizz_id',
+                  as: 'likes'
+                }
+              },
+              {
+                $lookup: {
+                  from: 'twizzs',
+                  localField: '_id',
+                  foreignField: 'parent_id',
+                  as: 'twizz_children'
+                }
+              },
+              {
+                $addFields: {
+                  bookmarks: { $size: '$bookmarks' },
+                  likes: { $size: '$likes' },
+                  comment_count: {
+                    $size: {
+                      $filter: {
+                        input: '$twizz_children',
+                        as: 'item',
+                        cond: { $eq: ['$$item.type', TwizzType.Comment] }
+                      }
+                    }
+                  },
+                  quote_count: {
+                    $size: {
+                      $filter: {
+                        input: '$twizz_children',
+                        as: 'item',
+                        cond: { $eq: ['$$item.type', TwizzType.QuoteTwizz] }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                $project: {
+                  twizz_children: 0,
+                  user: {
+                    password: 0,
+                    email_verify_token: 0,
+                    twizz_circle: 0,
+                    email_verify_otp: 0,
+                    email_verify_otp_expires_at: 0,
+                    forgot_password_token: 0,
+                    forgot_password_otp: 0,
+                    forgot_password_otp_expires_at: 0,
+                    date_of_birth: 0
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          $addFields: {
+            parent_twizz: { $arrayElemAt: ['$parent_twizz', 0] }
+          }
+        },
+        {
+          $lookup: {
+            from: 'likes',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'user_likes',
+            pipeline: [
+              {
+                $match: {
+                  user_id: user_id_objectId
+                }
+              }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'bookmarks',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'user_bookmarks',
+            pipeline: [
+              {
+                $match: {
+                  user_id: user_id_objectId
+                }
+              }
+            ]
+          }
+        },
         {
           $addFields: {
             bookmarks: {
@@ -327,17 +534,13 @@ class TwizzsService {
             likes: {
               $size: '$likes'
             },
-            retwizz_count: {
-              $size: {
-                $filter: {
-                  input: '$twizz_children',
-                  as: 'item',
-                  cond: {
-                    $eq: ['$$item.type', TwizzType.Retwizz]
-                  }
-                }
-              }
+            is_liked: {
+              $gt: [{ $size: '$user_likes' }, 0]
             },
+            is_bookmarked: {
+              $gt: [{ $size: '$user_bookmarks' }, 0]
+            },
+
             comment_count: {
               $size: {
                 $filter: {
@@ -364,11 +567,13 @@ class TwizzsService {
         },
         {
           $project: {
-            twizz_children: 0
+            twizz_children: 0,
+            user_likes: 0,
+            user_bookmarks: 0
           }
         },
         {
-          $skip: (page - 1) * limit // Công thức phân trang
+          $skip: (page - 1) * limit
         },
         {
           $limit: limit
@@ -385,9 +590,9 @@ class TwizzsService {
     twizzs.forEach((twizz) => {
       twizz.updated_at = date
       if (user_id) {
-        twizz.user_views = twizz.user_views + 1
+        twizz.user_views = (twizz.user_views || 0) + 1
       } else {
-        twizz.guest_views = twizz.guest_views + 1
+        twizz.guest_views = (twizz.guest_views || 0) + 1
       }
     })
     return {
@@ -416,7 +621,8 @@ class TwizzsService {
             $match: {
               user_id: {
                 $in: ids
-              }
+              },
+              type: { $ne: TwizzType.Comment }
             }
           },
           {
@@ -518,7 +724,7 @@ class TwizzsService {
               as: 'twizz_children'
             }
           },
-          // Lookup parent twizz for retwizz/quote/comment
+          // Lookup parent twizz for quote/comment
           {
             $lookup: {
               from: 'twizzs',
@@ -602,39 +808,14 @@ class TwizzsService {
                     ]
                   }
                 },
-                {
-                  $lookup: {
-                    from: 'twizzs',
-                    localField: '_id',
-                    foreignField: 'parent_id',
-                    as: 'user_retwizz',
-                    pipeline: [
-                      {
-                        $match: {
-                          user_id: user_id_objectId,
-                          type: TwizzType.Retwizz
-                        }
-                      }
-                    ]
-                  }
-                },
+
                 {
                   $addFields: {
                     bookmarks: { $size: '$bookmarks' },
                     likes: { $size: '$likes' },
                     is_liked: { $gt: [{ $size: '$user_likes' }, 0] },
                     is_bookmarked: { $gt: [{ $size: '$user_bookmarks' }, 0] },
-                    is_retwizzed: { $gt: [{ $size: '$user_retwizz' }, 0] },
-                    user_retwizz_id: { $arrayElemAt: ['$user_retwizz._id', 0] },
-                    retwizz_count: {
-                      $size: {
-                        $filter: {
-                          input: '$twizz_children',
-                          as: 'item',
-                          cond: { $eq: ['$$item.type', TwizzType.Retwizz] }
-                        }
-                      }
-                    },
+
                     comment_count: {
                       $size: {
                         $filter: {
@@ -725,59 +906,7 @@ class TwizzsService {
               is_bookmarked: {
                 $gt: [{ $size: '$user_bookmarks' }, 0]
               },
-              is_retwizzed: {
-                $gt: [
-                  {
-                    $size: {
-                      $filter: {
-                        input: '$twizz_children',
-                        as: 'item',
-                        cond: {
-                          $and: [
-                            { $eq: ['$$item.type', TwizzType.Retwizz] },
-                            { $eq: ['$$item.user_id', user_id_objectId] }
-                          ]
-                        }
-                      }
-                    }
-                  },
-                  0
-                ]
-              },
-              user_retwizz_id: {
-                $arrayElemAt: [
-                  {
-                    $map: {
-                      input: {
-                        $filter: {
-                          input: '$twizz_children',
-                          as: 'item',
-                          cond: {
-                            $and: [
-                              { $eq: ['$$item.type', TwizzType.Retwizz] },
-                              { $eq: ['$$item.user_id', user_id_objectId] }
-                            ]
-                          }
-                        }
-                      },
-                      as: 'match',
-                      in: '$$match._id'
-                    }
-                  },
-                  0
-                ]
-              },
-              retwizz_count: {
-                $size: {
-                  $filter: {
-                    input: '$twizz_children',
-                    as: 'item',
-                    cond: {
-                      $eq: ['$$item.type', TwizzType.Retwizz]
-                    }
-                  }
-                }
-              },
+
               comment_count: {
                 $size: {
                   $filter: {
@@ -804,27 +933,9 @@ class TwizzsService {
           },
           {
             $addFields: {
-              user_views: {
-                $cond: {
-                  if: { $eq: ['$type', TwizzType.Retwizz] },
-                  then: '$parent_twizz.user_views',
-                  else: '$user_views'
-                }
-              },
-              guest_views: {
-                $cond: {
-                  if: { $eq: ['$type', TwizzType.Retwizz] },
-                  then: '$parent_twizz.guest_views',
-                  else: '$guest_views'
-                }
-              },
-              updated_at: {
-                $cond: {
-                  if: { $eq: ['$type', TwizzType.Retwizz] },
-                  then: '$parent_twizz.updated_at',
-                  else: '$updated_at'
-                }
-              }
+              user_views: '$user_views',
+              guest_views: '$guest_views',
+              updated_at: '$updated_at'
             }
           },
           {
@@ -853,7 +964,8 @@ class TwizzsService {
             $match: {
               user_id: {
                 $in: ids
-              }
+              },
+              type: { $ne: TwizzType.Comment }
             }
           },
           {
@@ -933,12 +1045,13 @@ class TwizzsService {
 
     if (type !== undefined) {
       matchCondition.type = type
-      // If we are looking for non-retwizz/non-quote, we usually want top-level
+      // If we are looking for original Twizz, we usually want top-level
       if (type === TwizzType.Twizz) {
         matchCondition.parent_id = null
       }
     } else {
-      matchCondition.parent_id = null
+      // Default view: Everything except comments
+      matchCondition.type = { $ne: TwizzType.Comment }
     }
 
     const [twizzs, total] = await Promise.all([
@@ -1025,7 +1138,7 @@ class TwizzsService {
               as: 'twizz_children'
             }
           },
-          // Lookup parent twizz for retwizz/quote/comment
+          // Lookup parent twizz for quote/comment
           {
             $lookup: {
               from: 'twizzs',
@@ -1119,61 +1232,7 @@ class TwizzsService {
                     likes: { $size: '$likes' },
                     is_liked: viewer_user_id_objectId ? { $gt: [{ $size: '$user_likes' }, 0] } : false,
                     is_bookmarked: viewer_user_id_objectId ? { $gt: [{ $size: '$user_bookmarks' }, 0] } : false,
-                    is_retwizzed: viewer_user_id_objectId
-                      ? {
-                          $gt: [
-                            {
-                              $size: {
-                                $filter: {
-                                  input: '$twizz_children',
-                                  as: 'item',
-                                  cond: {
-                                    $and: [
-                                      { $eq: ['$$item.type', TwizzType.Retwizz] },
-                                      { $eq: ['$$item.user_id', viewer_user_id_objectId] }
-                                    ]
-                                  }
-                                }
-                              }
-                            },
-                            0
-                          ]
-                        }
-                      : false,
-                    user_retwizz_id: viewer_user_id_objectId
-                      ? {
-                          $arrayElemAt: [
-                            {
-                              $map: {
-                                input: {
-                                  $filter: {
-                                    input: '$twizz_children',
-                                    as: 'item',
-                                    cond: {
-                                      $and: [
-                                        { $eq: ['$$item.type', TwizzType.Retwizz] },
-                                        { $eq: ['$$item.user_id', viewer_user_id_objectId] }
-                                      ]
-                                    }
-                                  }
-                                },
-                                as: 'match',
-                                in: '$$match._id'
-                              }
-                            },
-                            0
-                          ]
-                        }
-                      : null,
-                    retwizz_count: {
-                      $size: {
-                        $filter: {
-                          input: '$twizz_children',
-                          as: 'item',
-                          cond: { $eq: ['$$item.type', TwizzType.Retwizz] }
-                        }
-                      }
-                    },
+
                     comment_count: {
                       $size: {
                         $filter: {
@@ -1268,63 +1327,7 @@ class TwizzsService {
               is_bookmarked: {
                 $gt: [{ $size: '$user_bookmarks' }, 0]
               },
-              is_retwizzed: viewer_user_id_objectId
-                ? {
-                    $gt: [
-                      {
-                        $size: {
-                          $filter: {
-                            input: '$twizz_children',
-                            as: 'item',
-                            cond: {
-                              $and: [
-                                { $eq: ['$$item.type', TwizzType.Retwizz] },
-                                { $eq: ['$$item.user_id', viewer_user_id_objectId] }
-                              ]
-                            }
-                          }
-                        }
-                      },
-                      0
-                    ]
-                  }
-                : false,
-              user_retwizz_id: viewer_user_id_objectId
-                ? {
-                    $arrayElemAt: [
-                      {
-                        $map: {
-                          input: {
-                            $filter: {
-                              input: '$twizz_children',
-                              as: 'item',
-                              cond: {
-                                $and: [
-                                  { $eq: ['$$item.type', TwizzType.Retwizz] },
-                                  { $eq: ['$$item.user_id', viewer_user_id_objectId] }
-                                ]
-                              }
-                            }
-                          },
-                          as: 'match',
-                          in: '$$match._id'
-                        }
-                      },
-                      0
-                    ]
-                  }
-                : null,
-              retwizz_count: {
-                $size: {
-                  $filter: {
-                    input: '$twizz_children',
-                    as: 'item',
-                    cond: {
-                      $eq: ['$$item.type', TwizzType.Retwizz]
-                    }
-                  }
-                }
-              },
+
               comment_count: {
                 $size: {
                   $filter: {
@@ -1351,27 +1354,9 @@ class TwizzsService {
           },
           {
             $addFields: {
-              user_views: {
-                $cond: {
-                  if: { $eq: ['$type', TwizzType.Retwizz] },
-                  then: '$parent_twizz.user_views',
-                  else: '$user_views'
-                }
-              },
-              guest_views: {
-                $cond: {
-                  if: { $eq: ['$type', TwizzType.Retwizz] },
-                  then: '$parent_twizz.guest_views',
-                  else: '$guest_views'
-                }
-              },
-              updated_at: {
-                $cond: {
-                  if: { $eq: ['$type', TwizzType.Retwizz] },
-                  then: '$parent_twizz.updated_at',
-                  else: '$updated_at'
-                }
-              }
+              user_views: '$user_views',
+              guest_views: '$guest_views',
+              updated_at: '$updated_at'
             }
           },
           {

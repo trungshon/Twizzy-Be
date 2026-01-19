@@ -25,6 +25,7 @@ interface UserType {
   username?: string
   avatar?: string
   cover_photo?: string
+  username_changed?: boolean
 }
 
 export default class User {
@@ -51,6 +52,7 @@ export default class User {
   username: string
   avatar: string
   cover_photo: string
+  username_changed: boolean
 
   constructor(user: UserType) {
     const date = new Date()
@@ -76,5 +78,7 @@ export default class User {
     this.username = user.username || ''
     this.avatar = user.avatar || ''
     this.cover_photo = user.cover_photo || ''
+    this.username_changed = user.username_changed || false
   }
 }
+

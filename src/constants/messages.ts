@@ -57,6 +57,7 @@ export const USER_MESSAGES = {
   WEBSITE_MUST_BE_A_STRING: 'Website phải là một chuỗi',
   WEBSITE_MUST_BE_FROM_1_TO_200_CHARACTERS: 'Website phải có từ 1 đến 200 ký tự',
   USERNAME_MUST_BE_A_STRING: 'Username phải là một chuỗi',
+  USERNAME_CAN_ONLY_BE_CHANGED_ONCE: 'Username chỉ được thay đổi một lần duy nhất',
   USERNAME_INVALID:
     'Username phải có từ 4 đến 15 ký tự và chỉ chứa chữ cái, số, dấu gạch dưới và không được chỉ chứa số',
   USERNAME_EXISTED: 'Username đã tồn tại',

@@ -149,17 +149,6 @@ class SearchService {
               likes: {
                 $size: '$likes'
               },
-              retwizz_count: {
-                $size: {
-                  $filter: {
-                    input: '$twizz_children',
-                    as: 'item',
-                    cond: {
-                      $eq: ['$$item.type', TwizzType.Retwizz]
-                    }
-                  }
-                }
-              },
               comment_count: {
                 $size: {
                   $filter: {

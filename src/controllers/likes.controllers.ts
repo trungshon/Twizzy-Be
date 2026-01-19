@@ -49,3 +49,29 @@ export const getUserLikedTwizzsController = async (
     }
   })
 }
+
+export const getUsersWhoLikedTwizzController = async (
+  req: Request<{ twizz_id: string }, any, any, Pagination>,
+  res: Response
+) => {
+  const twizz_id = req.params.twizz_id
+  const viewer_user_id = req.decoded_authorization?.user_id
+  const limit = Number(req.query.limit)
+  const page = Number(req.query.page)
+
+  const result = await likesService.getUsersWhoLikedTwizz({
+    twizz_id,
+    viewer_user_id,
+    limit,
+    page
+  })
+  return res.json({
+    message: LIKE_MESSAGES.LIKE_TWIZZ_SUCCESSFULLY,
+    result: {
+      users: result.users,
+      limit,
+      page,
+      total_page: Math.ceil(result.total / limit)
+    }
+  })
+}

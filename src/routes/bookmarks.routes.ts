@@ -2,7 +2,8 @@ import { Router } from 'express'
 import {
   bookmarkTwizzController,
   unbookmarkTwizzController,
-  getUserBookmarkedTwizzsController
+  getUserBookmarkedTwizzsController,
+  getUsersWhoBookmarkedTwizzController
 } from '~/controllers/bookmarks.controllers'
 import { accessTokenValidator, verifiedUserValidator, isUserLoggedInValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
@@ -25,7 +26,7 @@ const bookmarksRouter = Router()
 bookmarksRouter.post(
   '/',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   twizzIdValidator,
   wrapRequestHandler(bookmarkTwizzController)
 )
@@ -41,7 +42,7 @@ bookmarksRouter.post(
 bookmarksRouter.delete(
   '/twizzs/:twizz_id',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   twizzIdValidator,
   wrapRequestHandler(unbookmarkTwizzController)
 )
@@ -62,7 +63,28 @@ bookmarksRouter.get(
   '/users/:user_id/bookmarked-twizzs',
   paginationValidator,
   isUserLoggedInValidator(accessTokenValidator),
-  isUserLoggedInValidator(verifiedUserValidator),
+  // isUserLoggedInValidator(verifiedUserValidator),
   wrapRequestHandler(getUserBookmarkedTwizzsController)
 )
+
+/**
+ * @description Get users who bookmarked a specific twizz
+ * @path /twizzs/:twizz_id/users
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ * @query {
+ *   limit: number
+ *   page: number
+ * }
+ */
+bookmarksRouter.get(
+  '/twizzs/:twizz_id/users',
+  twizzIdValidator,
+  paginationValidator,
+  isUserLoggedInValidator(accessTokenValidator),
+  wrapRequestHandler(getUsersWhoBookmarkedTwizzController)
+)
+
 export default bookmarksRouter

@@ -4,7 +4,8 @@ import wrapRequestHandler from '~/utils/handlers'
 import {
   likeTwizzController,
   unlikeTwizzController,
-  getUserLikedTwizzsController
+  getUserLikedTwizzsController,
+  getUsersWhoLikedTwizzController
 } from '~/controllers/likes.controllers'
 import { twizzIdValidator } from '~/middlewares/twizzs.middlewares'
 import { paginationValidator } from '~/middlewares/twizzs.middlewares'
@@ -25,7 +26,7 @@ const likesRouter = Router()
 likesRouter.post(
   '/',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   twizzIdValidator,
   wrapRequestHandler(likeTwizzController)
 )
@@ -41,7 +42,7 @@ likesRouter.post(
 likesRouter.delete(
   '/twizzs/:twizz_id',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   twizzIdValidator,
   wrapRequestHandler(unlikeTwizzController)
 )
@@ -62,7 +63,28 @@ likesRouter.get(
   '/users/:user_id/liked-twizzs',
   paginationValidator,
   isUserLoggedInValidator(accessTokenValidator),
-  isUserLoggedInValidator(verifiedUserValidator),
+  // isUserLoggedInValidator(verifiedUserValidator),
   wrapRequestHandler(getUserLikedTwizzsController)
 )
+
+/**
+ * @description Get users who liked a specific twizz
+ * @path /twizzs/:twizz_id/users
+ * @method GET
+ * @header {
+ *   Authorization?: Bearer <access_token>
+ * }
+ * @query {
+ *   limit: number
+ *   page: number
+ * }
+ */
+likesRouter.get(
+  '/twizzs/:twizz_id/users',
+  twizzIdValidator,
+  paginationValidator,
+  isUserLoggedInValidator(accessTokenValidator),
+  wrapRequestHandler(getUsersWhoLikedTwizzController)
+)
+
 export default likesRouter

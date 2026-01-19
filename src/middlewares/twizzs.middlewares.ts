@@ -35,9 +35,9 @@ export const createTwizzValidator = validate(
       custom: {
         options: async (value, { req }) => {
           const type = req.body.type as TwizzType
-          // Nếu `type` là retwizz, comment, quotetwizz thì `parent_id`
+          // Nếu `type` là comment, quotetwizz thì `parent_id`
           // phải là `twizz_id` của twizz cha
-          if ([TwizzType.Retwizz, TwizzType.Comment, TwizzType.QuoteTwizz].includes(type) && !ObjectId.isValid(value)) {
+          if ([TwizzType.Comment, TwizzType.QuoteTwizz].includes(type) && !ObjectId.isValid(value)) {
             throw new Error(TWIZZ_MESSAGES.INVALID_PARENT_ID)
           }
           // Nếu `type` là twizz thì `parent_id` phải là null
@@ -66,10 +66,7 @@ export const createTwizzValidator = validate(
             throw new Error(TWIZZ_MESSAGES.CONTENT_MUST_BE_A_NON_EMPTY_STRING)
           }
 
-          // Nếu `type` là retwizz thì `content` phải là `''`
-          if (type === TwizzType.Retwizz && value !== '') {
-            throw new Error(TWIZZ_MESSAGES.CONTENT_MUST_BE_AN_EMPTY_STRING)
-          }
+
           return true
         }
       }
@@ -213,17 +210,7 @@ export const twizzIdValidator = validate(
                     likes: {
                       $size: '$likes'
                     },
-                    retwizz_count: {
-                      $size: {
-                        $filter: {
-                          input: '$twizz_children',
-                          as: 'item',
-                          cond: {
-                            $eq: ['$$item.type', TwizzType.Retwizz]
-                          }
-                        }
-                      }
-                    },
+
                     comment_count: {
                       $size: {
                         $filter: {

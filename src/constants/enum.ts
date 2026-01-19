@@ -23,7 +23,6 @@ export enum MediaTypeQuery {
 
 export enum TwizzType {
   Twizz,
-  Retwizz,
   Comment,
   QuoteTwizz
 }

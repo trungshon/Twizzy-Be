@@ -212,7 +212,7 @@ usersRouter.get('/me', accessTokenValidator, wrapRequestHandler(getMeController)
 usersRouter.patch(
   '/me',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   updateMeValidator,
   filterMiddleware<UpdateMeReqBody>([
     'name',
@@ -235,7 +235,9 @@ usersRouter.patch(
  *   Authorization: Bearer <access_token>
  * }
  */
-usersRouter.get('/:user_id/followers', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(getFollowersController))
+usersRouter.get('/:user_id/followers', accessTokenValidator,
+  // verifiedUserValidator,
+  wrapRequestHandler(getFollowersController))
 
 /**
  * @description Get following list
@@ -245,7 +247,9 @@ usersRouter.get('/:user_id/followers', accessTokenValidator, verifiedUserValidat
  *   Authorization: Bearer <access_token>
  * }
  */
-usersRouter.get('/:user_id/following', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(getFollowingController))
+usersRouter.get('/:user_id/following', accessTokenValidator,
+  // verifiedUserValidator,
+  wrapRequestHandler(getFollowingController))
 
 /**
  * @description Get user profile by username
@@ -255,7 +259,9 @@ usersRouter.get('/:user_id/following', accessTokenValidator, verifiedUserValidat
  *   Authorization: Bearer <access_token>
  * }
  */
-usersRouter.get('/:username', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(getProfileController))
+usersRouter.get('/:username', accessTokenValidator,
+  // verifiedUserValidator,
+  wrapRequestHandler(getProfileController))
 
 /**
  * @description Follow someone
@@ -271,7 +277,7 @@ usersRouter.get('/:username', accessTokenValidator, verifiedUserValidator, wrapR
 usersRouter.post(
   '/follow',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   followValidator,
   wrapRequestHandler(followController)
 )
@@ -287,7 +293,7 @@ usersRouter.post(
 usersRouter.delete(
   '/follow/:user_id',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   unfollowValidator,
   wrapRequestHandler(unfollowController)
 )
@@ -308,7 +314,7 @@ usersRouter.delete(
 usersRouter.put(
   '/change-password',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   changePasswordValidator,
   wrapRequestHandler(changePasswordController)
 )

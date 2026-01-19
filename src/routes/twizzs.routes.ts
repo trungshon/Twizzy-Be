@@ -36,7 +36,7 @@ const twizzsRouter = Router()
 twizzsRouter.post(
   '/',
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   createTwizzValidator,
   wrapRequestHandler(createTwizzController)
 )
@@ -98,7 +98,7 @@ twizzsRouter.get(
   '/',
   paginationValidator,
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   wrapRequestHandler(getNewFeedsController)
 )
 
@@ -112,14 +112,14 @@ twizzsRouter.get(
  * @query {
  *   limit: number
  *   page: number
- *   type?: TwizzType (0=Twizz, 1=Retwizz, 3=QuoteTwizz)
+ *   type?: TwizzType
  * }
  */
 twizzsRouter.get(
   '/users/:user_id/twizzs',
   paginationValidator,
   isUserLoggedInValidator(accessTokenValidator),
-  isUserLoggedInValidator(verifiedUserValidator),
+  // isUserLoggedInValidator(verifiedUserValidator),
   wrapRequestHandler(getUserTwizzsController)
 )
 
@@ -135,7 +135,7 @@ twizzsRouter.delete(
   '/:twizz_id',
   twizzIdValidator,
   accessTokenValidator,
-  verifiedUserValidator,
+  // verifiedUserValidator,
   audienceValidator,
   wrapRequestHandler(deleteTwizzController)
 )

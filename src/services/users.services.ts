@@ -483,10 +483,24 @@ class UsersService {
 
   async updateMe(user_id: string, payload: UpdateMeReqBody) {
     const _payload = payload.date_of_birth ? { ...payload, date_of_birth: new Date(payload.date_of_birth) } : payload
+    const userUpdate: any = { ...(_payload as UpdateMeReqBody & { date_of_birth?: Date }) }
+
+    // Logic username
+    if (payload.username) {
+      const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+      if (user?.username_changed) {
+        throw new ErrorWithStatus({
+          message: USER_MESSAGES.USERNAME_CAN_ONLY_BE_CHANGED_ONCE,
+          status: HTTP_STATUS.FORBIDDEN
+        })
+      }
+      userUpdate.username_changed = true
+    }
+
     const user = await databaseService.users.findOneAndUpdate(
       { _id: new ObjectId(user_id) },
       {
-        $set: { ...(_payload as UpdateMeReqBody & { date_of_birth?: Date }) },
+        $set: userUpdate,
         $currentDate: { updated_at: true }
       },
       {
