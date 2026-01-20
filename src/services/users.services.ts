@@ -573,8 +573,7 @@ class UsersService {
       .aggregate([
         {
           $match: {
-            followed_user_id: new ObjectId(user_id),
-            user_id: { $ne: new ObjectId(current_user_id) }
+            followed_user_id: new ObjectId(user_id)
           }
         },
         {
@@ -657,8 +656,7 @@ class UsersService {
       .aggregate([
         {
           $match: {
-            user_id: new ObjectId(user_id),
-            followed_user_id: { $ne: new ObjectId(current_user_id) }
+            user_id: new ObjectId(user_id)
           }
         },
         {

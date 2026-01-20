@@ -58,7 +58,7 @@ export const createTwizzValidator = validate(
           // Nếu `type` là comment, quotetwizz, twizz và không có `mentions` và `hashtags`
           //  thì `content` phải là string và không được rỗngrỗng
           if (
-            [TwizzType.Comment, TwizzType.QuoteTwizz, TwizzType.Twizz].includes(type) &&
+            [TwizzType.Comment, TwizzType.Twizz].includes(type) &&
             isEmpty(mentions) &&
             isEmpty(hashtags) &&
             value === ''
