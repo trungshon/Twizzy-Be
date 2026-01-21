@@ -1,7 +1,7 @@
 import databaseService from './database.services'
 import { SearchQuery } from '~/models/requests/Search.requests'
 import { ObjectId } from 'mongodb'
-import { MediaType, MediaTypeQuery, PeopleFollow, TwizzType } from '~/constants/enum'
+import { MediaType, MediaTypeQuery, PeopleFollow, TwizzAudience, TwizzType } from '~/constants/enum'
 
 class SearchService {
   async search({
@@ -19,7 +19,14 @@ class SearchService {
     media_type?: MediaTypeQuery
     people_follow?: PeopleFollow
   }) {
-    const $match: any = { $text: { $search: content } }
+    const $match: any = {
+      type: { $ne: TwizzType.Comment }
+    }
+    if (content.trim() === '') {
+      $match.content = ''
+    } else {
+      $match.$text = { $search: content }
+    }
     if (media_type) {
       if (media_type === MediaTypeQuery.Image) {
         $match['medias.type'] = MediaType.Image
@@ -68,7 +75,10 @@ class SearchService {
             $match: {
               $or: [
                 {
-                  audience: 0
+                  audience: TwizzAudience.Everyone
+                },
+                {
+                  user_id: new ObjectId(user_id)
                 },
                 {
                   $and: [
@@ -135,10 +145,131 @@ class SearchService {
           },
           {
             $lookup: {
+              from: 'likes',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'user_likes',
+              pipeline: [
+                {
+                  $match: {
+                    user_id: new ObjectId(user_id)
+                  }
+                }
+              ]
+            }
+          },
+          {
+            $lookup: {
+              from: 'bookmarks',
+              localField: '_id',
+              foreignField: 'twizz_id',
+              as: 'user_bookmarks',
+              pipeline: [
+                {
+                  $match: {
+                    user_id: new ObjectId(user_id)
+                  }
+                }
+              ]
+            }
+          },
+          {
+            $lookup: {
               from: 'twizzs',
               localField: '_id',
               foreignField: 'parent_id',
               as: 'twizz_children'
+            }
+          },
+          // Lookup parent twizz for retwizz/quote/comment
+          {
+            $lookup: {
+              from: 'twizzs',
+              localField: 'parent_id',
+              foreignField: '_id',
+              pipeline: [
+                {
+                  $lookup: {
+                    from: 'users',
+                    localField: 'user_id',
+                    foreignField: '_id',
+                    as: 'user'
+                  }
+                },
+                {
+                  $unwind: {
+                    path: '$user',
+                    preserveNullAndEmptyArrays: true
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'twizzs',
+                    localField: 'parent_id',
+                    foreignField: '_id',
+                    pipeline: [
+                      {
+                        $lookup: {
+                          from: 'users',
+                          localField: 'user_id',
+                          foreignField: '_id',
+                          as: 'user'
+                        }
+                      },
+                      {
+                        $unwind: {
+                          path: '$user',
+                          preserveNullAndEmptyArrays: true
+                        }
+                      },
+                      {
+                        $project: {
+                          user: {
+                            password: 0,
+                            email_verify_token: 0,
+                            twizz_circle: 0,
+                            email_verify_otp: 0,
+                            email_verify_otp_expires_at: 0,
+                            forgot_password_otp: 0,
+                            forgot_password_otp_expires_at: 0,
+                            forgot_password_token: 0,
+                            date_of_birth: 0
+                          }
+                        }
+                      }
+                    ],
+                    as: 'parent_twizz'
+                  }
+                },
+                {
+                  $unwind: {
+                    path: '$parent_twizz',
+                    preserveNullAndEmptyArrays: true
+                  }
+                },
+                {
+                  $project: {
+                    user: {
+                      password: 0,
+                      email_verify_token: 0,
+                      twizz_circle: 0,
+                      email_verify_otp: 0,
+                      email_verify_otp_expires_at: 0,
+                      forgot_password_otp: 0,
+                      forgot_password_otp_expires_at: 0,
+                      forgot_password_token: 0,
+                      date_of_birth: 0
+                    }
+                  }
+                }
+              ],
+              as: 'parent_twizz'
+            }
+          },
+          {
+            $unwind: {
+              path: '$parent_twizz',
+              preserveNullAndEmptyArrays: true
             }
           },
           {
@@ -148,6 +279,12 @@ class SearchService {
               },
               likes: {
                 $size: '$likes'
+              },
+              is_liked: {
+                $gt: [{ $size: '$user_likes' }, 0]
+              },
+              is_bookmarked: {
+                $gt: [{ $size: '$user_bookmarks' }, 0]
               },
               comment_count: {
                 $size: {
@@ -176,12 +313,15 @@ class SearchService {
           {
             $project: {
               twizz_children: 0,
+              user_likes: 0,
+              user_bookmarks: 0,
               user: {
                 password: 0,
                 email_verify_token: 0,
                 twizz_circle: 0,
                 email_verify_otp: 0,
                 email_verify_otp_expires_at: 0,
+                forgot_password_token: 0,
                 forgot_password_otp: 0,
                 forgot_password_otp_expires_at: 0,
                 date_of_birth: 0
@@ -262,12 +402,16 @@ class SearchService {
     content,
     limit,
     page,
-    field
+    field,
+    people_follow,
+    current_user_id
   }: {
     limit: number
     page: number
     content: string
     field?: 'username' | 'name'
+    people_follow?: PeopleFollow
+    current_user_id?: string
   }) {
     const $match: any = {}
 
@@ -281,27 +425,69 @@ class SearchService {
       $match.$or = [{ username: { $regex: content, $options: 'i' } }, { name: { $regex: content, $options: 'i' } }]
     }
 
-    // Only return verified users
-    $match.verify = 1
+    if (people_follow && people_follow === PeopleFollow.Following && current_user_id) {
+      const user_id_objectId = new ObjectId(current_user_id)
+      const followed_users_ids = await databaseService.followers
+        .find(
+          {
+            user_id: user_id_objectId
+          },
+          { projection: { followed_user_id: 1, _id: 0 } }
+        )
+        .toArray()
+      const ids = followed_users_ids.map((item) => item.followed_user_id)
+      $match['_id'] = {
+        $in: ids
+      }
+    }
 
     const [users, totalResult] = await Promise.all([
       databaseService.users
-        .find($match, {
-          projection: {
-            password: 0,
-            email: 0,
-            email_verify_token: 0,
-            forgot_password_token: 0,
-            email_verify_otp: 0,
-            forgot_password_otp: 0,
-            email_verify_otp_expires_at: 0,
-            forgot_password_otp_expires_at: 0,
-            date_of_birth: 0,
-            twizz_circle: 0
-          }
-        })
-        .skip((page - 1) * limit)
-        .limit(limit)
+        .aggregate([
+          { $match },
+          {
+            $lookup: {
+              from: 'followers',
+              let: { user_id: '$_id' },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ['$followed_user_id', '$$user_id'] },
+                        { $eq: ['$user_id', current_user_id ? new ObjectId(current_user_id) : null] }
+                      ]
+                    }
+                  }
+                },
+                { $limit: 1 }
+              ],
+              as: 'following_info'
+            }
+          },
+          {
+            $addFields: {
+              is_following: { $gt: [{ $size: '$following_info' }, 0] }
+            }
+          },
+          {
+            $project: {
+              password: 0,
+              email: 0,
+              email_verify_token: 0,
+              forgot_password_token: 0,
+              email_verify_otp: 0,
+              forgot_password_otp: 0,
+              email_verify_otp_expires_at: 0,
+              forgot_password_otp_expires_at: 0,
+              date_of_birth: 0,
+              twizz_circle: 0,
+              following_info: 0
+            }
+          },
+          { $skip: (page - 1) * limit },
+          { $limit: limit }
+        ])
         .toArray(),
       databaseService.users.countDocuments($match)
     ])

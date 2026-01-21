@@ -3,7 +3,7 @@ import databaseService from './database.services'
 import Twizz from '~/models/schemas/Twizz.schema'
 import { ObjectId, WithId } from 'mongodb'
 import Hashtag from '~/models/schemas/Hashtag.schema'
-import { TwizzType } from '~/constants/enum'
+import { TwizzAudience, TwizzType } from '~/constants/enum'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { ErrorWithStatus } from '~/models/Errors'
 import { TWIZZ_MESSAGES } from '~/constants/messages'
@@ -170,11 +170,54 @@ class TwizzsService {
                 }
               },
               {
+                $lookup: {
+                  from: 'twizzs',
+                  localField: 'parent_id',
+                  foreignField: '_id',
+                  pipeline: [
+                    {
+                      $lookup: {
+                        from: 'users',
+                        localField: 'user_id',
+                        foreignField: '_id',
+                        as: 'user'
+                      }
+                    },
+                    {
+                      $unwind: {
+                        path: '$user',
+                        preserveNullAndEmptyArrays: true
+                      }
+                    },
+                    {
+                      $project: {
+                        user: {
+                          password: 0,
+                          email_verify_token: 0,
+                          email_verify_otp: 0,
+                          email_verify_otp_expires_at: 0,
+                          forgot_password_otp: 0,
+                          forgot_password_otp_expires_at: 0,
+                          forgot_password_token: 0,
+                          date_of_birth: 0
+                        }
+                      }
+                    }
+                  ],
+                  as: 'parent_twizz'
+                }
+              },
+              {
+                $unwind: {
+                  path: '$parent_twizz',
+                  preserveNullAndEmptyArrays: true
+                }
+              },
+              {
                 $project: {
                   user: {
                     password: 0,
                     email_verify_token: 0,
-                    twizz_circle: 0,
                     email_verify_otp: 0,
                     email_verify_otp_expires_at: 0,
                     forgot_password_token: 0,
@@ -241,7 +284,6 @@ class TwizzsService {
             user: {
               password: 0,
               email_verify_token: 0,
-              twizz_circle: 0,
               email_verify_otp: 0,
               email_verify_otp_expires_at: 0,
               forgot_password_token: 0,
@@ -322,7 +364,6 @@ class TwizzsService {
                 $project: {
                   password: 0,
                   email_verify_token: 0,
-                  twizz_circle: 0,
                   email_verify_otp: 0,
                   email_verify_otp_expires_at: 0,
                   forgot_password_token: 0,
@@ -337,6 +378,30 @@ class TwizzsService {
         },
         {
           $unwind: '$user'
+        },
+        {
+          $match: {
+            $or: [
+              {
+                audience: TwizzAudience.Everyone
+              },
+              {
+                user_id: user_id_objectId
+              },
+              {
+                $and: [
+                  {
+                    audience: TwizzAudience.TwizzCircle
+                  },
+                  {
+                    'user.twizz_circle': {
+                      $in: user_id_objectId ? [user_id_objectId] : []
+                    }
+                  }
+                ]
+              }
+            ]
+          }
         },
         {
           $lookup: {
@@ -418,6 +483,50 @@ class TwizzsService {
               },
               {
                 $lookup: {
+                  from: 'twizzs',
+                  localField: 'parent_id',
+                  foreignField: '_id',
+                  pipeline: [
+                    {
+                      $lookup: {
+                        from: 'users',
+                        localField: 'user_id',
+                        foreignField: '_id',
+                        as: 'user'
+                      }
+                    },
+                    {
+                      $unwind: {
+                        path: '$user',
+                        preserveNullAndEmptyArrays: true
+                      }
+                    },
+                    {
+                      $project: {
+                        user: {
+                          password: 0,
+                          email_verify_token: 0,
+                          email_verify_otp: 0,
+                          email_verify_otp_expires_at: 0,
+                          forgot_password_otp: 0,
+                          forgot_password_otp_expires_at: 0,
+                          forgot_password_token: 0,
+                          date_of_birth: 0
+                        }
+                      }
+                    }
+                  ],
+                  as: 'parent_twizz'
+                }
+              },
+              {
+                $unwind: {
+                  path: '$parent_twizz',
+                  preserveNullAndEmptyArrays: true
+                }
+              },
+              {
+                $lookup: {
                   from: 'hashtags',
                   localField: 'hashtags',
                   foreignField: '_id',
@@ -478,7 +587,6 @@ class TwizzsService {
                   user: {
                     password: 0,
                     email_verify_token: 0,
-                    twizz_circle: 0,
                     email_verify_otp: 0,
                     email_verify_otp_expires_at: 0,
                     forgot_password_token: 0,
@@ -642,12 +750,15 @@ class TwizzsService {
             $match: {
               $or: [
                 {
-                  audience: 0
+                  audience: TwizzAudience.Everyone
+                },
+                {
+                  user_id: user_id_objectId
                 },
                 {
                   $and: [
                     {
-                      audience: 1
+                      audience: TwizzAudience.TwizzCircle
                     },
                     {
                       'user.twizz_circle': {
@@ -748,6 +859,50 @@ class TwizzsService {
                 },
                 {
                   $lookup: {
+                    from: 'twizzs',
+                    localField: 'parent_id',
+                    foreignField: '_id',
+                    pipeline: [
+                      {
+                        $lookup: {
+                          from: 'users',
+                          localField: 'user_id',
+                          foreignField: '_id',
+                          as: 'user'
+                        }
+                      },
+                      {
+                        $unwind: {
+                          path: '$user',
+                          preserveNullAndEmptyArrays: true
+                        }
+                      },
+                      {
+                        $project: {
+                          user: {
+                            password: 0,
+                            email_verify_token: 0,
+                            email_verify_otp: 0,
+                            email_verify_otp_expires_at: 0,
+                            forgot_password_otp: 0,
+                            forgot_password_otp_expires_at: 0,
+                            forgot_password_token: 0,
+                            date_of_birth: 0
+                          }
+                        }
+                      }
+                    ],
+                    as: 'parent_twizz'
+                  }
+                },
+                {
+                  $unwind: {
+                    path: '$parent_twizz',
+                    preserveNullAndEmptyArrays: true
+                  }
+                },
+                {
+                  $lookup: {
                     from: 'hashtags',
                     localField: 'hashtags',
                     foreignField: '_id',
@@ -808,7 +963,6 @@ class TwizzsService {
                     ]
                   }
                 },
-
                 {
                   $addFields: {
                     bookmarks: { $size: '$bookmarks' },
@@ -844,7 +998,6 @@ class TwizzsService {
                     user: {
                       password: 0,
                       email_verify_token: 0,
-                      twizz_circle: 0,
                       email_verify_otp: 0,
                       email_verify_otp_expires_at: 0,
                       forgot_password_token: 0,
@@ -946,7 +1099,6 @@ class TwizzsService {
               user: {
                 password: 0,
                 email_verify_token: 0,
-                twizz_circle: 0,
                 email_verify_otp: 0,
                 email_verify_otp_expires_at: 0,
                 forgot_password_token: 0,
@@ -1083,6 +1235,30 @@ class TwizzsService {
             }
           },
           {
+            $match: {
+              $or: [
+                {
+                  audience: TwizzAudience.Everyone
+                },
+                {
+                  user_id: viewer_user_id_objectId
+                },
+                {
+                  $and: [
+                    {
+                      audience: TwizzAudience.TwizzCircle
+                    },
+                    {
+                      'user.twizz_circle': {
+                        $in: viewer_user_id_objectId ? [viewer_user_id_objectId] : []
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
             $lookup: {
               from: 'hashtags',
               localField: 'hashtags',
@@ -1157,6 +1333,50 @@ class TwizzsService {
                 {
                   $unwind: {
                     path: '$user',
+                    preserveNullAndEmptyArrays: true
+                  }
+                },
+                {
+                  $lookup: {
+                    from: 'twizzs',
+                    localField: 'parent_id',
+                    foreignField: '_id',
+                    pipeline: [
+                      {
+                        $lookup: {
+                          from: 'users',
+                          localField: 'user_id',
+                          foreignField: '_id',
+                          as: 'user'
+                        }
+                      },
+                      {
+                        $unwind: {
+                          path: '$user',
+                          preserveNullAndEmptyArrays: true
+                        }
+                      },
+                      {
+                        $project: {
+                          user: {
+                            password: 0,
+                            email_verify_token: 0,
+                            email_verify_otp: 0,
+                            email_verify_otp_expires_at: 0,
+                            forgot_password_otp: 0,
+                            forgot_password_otp_expires_at: 0,
+                            forgot_password_token: 0,
+                            date_of_birth: 0
+                          }
+                        }
+                      }
+                    ],
+                    as: 'parent_twizz'
+                  }
+                },
+                {
+                  $unwind: {
+                    path: '$parent_twizz',
                     preserveNullAndEmptyArrays: true
                   }
                 },
@@ -1261,7 +1481,6 @@ class TwizzsService {
                     user: {
                       password: 0,
                       email_verify_token: 0,
-                      twizz_circle: 0,
                       email_verify_otp: 0,
                       email_verify_otp_expires_at: 0,
                       forgot_password_token: 0,
@@ -1367,7 +1586,6 @@ class TwizzsService {
               user: {
                 password: 0,
                 email_verify_token: 0,
-                twizz_circle: 0,
                 email_verify_otp: 0,
                 email_verify_otp_expires_at: 0,
                 forgot_password_token: 0,

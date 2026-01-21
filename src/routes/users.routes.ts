@@ -222,7 +222,8 @@ usersRouter.patch(
     'website',
     'username',
     'avatar',
-    'cover_photo'
+    'cover_photo',
+    'twizz_circle'
   ]),
   wrapRequestHandler(updateMeController)
 )

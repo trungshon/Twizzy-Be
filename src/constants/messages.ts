@@ -74,7 +74,7 @@ export const USER_MESSAGES = {
   OTP_SENT_SUCCESSFULLY: 'OTP đã được gửi thành công đến email của bạn',
   FOLLOW_SUCCESSFULLY: 'Theo dõi người dùng thành công',
   FOLLOWED_ALREADY: 'Đã theo dõi người dùng này',
-  ALREADY_UNFOLLOWED: 'Đã hủy theo dõi người dùng này',
+  ALREADY_UNFOLLOWED: 'Bạn chưa theo dõi người dùng này',
   UNFOLLOW_SUCCESSFULLY: 'Hủy theo dõi người dùng thành công',
   OLD_PASSWORD_IS_INCORRECT: 'Mật khẩu cũ không chính xác',
   NEW_PASSWORD_MUST_BE_DIFFERENT: 'Mật khẩu mới phải khác mật khẩu cũ',

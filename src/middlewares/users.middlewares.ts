@@ -552,7 +552,25 @@ export const updateMeValidator = validate(
         }
       },
       avatar: imageUrlSchema,
-      cover_photo: imageUrlSchema
+      cover_photo: imageUrlSchema,
+      twizz_circle: {
+        optional: true,
+        isArray: {
+          errorMessage: 'Twizz circle must be an array'
+        },
+        custom: {
+          options: (value: string[]) => {
+            if (!value) return true
+            // Validate each ID is a valid ObjectId string
+            for (const id of value) {
+              if (!ObjectId.isValid(id)) {
+                throw new Error(`Invalid user ID: ${id}`)
+              }
+            }
+            return true
+          }
+        }
+      }
     },
     ['body']
   )

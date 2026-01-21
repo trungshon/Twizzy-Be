@@ -434,10 +434,30 @@ class UsersService {
       user_id: new ObjectId(user_id)
     })
 
+    // Populate twizz_circle with user details
+    let twizzCircleUsers: any[] = []
+    if (user.twizz_circle && user.twizz_circle.length > 0) {
+      twizzCircleUsers = await databaseService.users
+        .find(
+          { _id: { $in: user.twizz_circle } },
+          {
+            projection: {
+              _id: 1,
+              name: 1,
+              username: 1,
+              avatar: 1,
+              verify: 1
+            }
+          }
+        )
+        .toArray()
+    }
+
     return {
       ...user,
       followers_count: followersCount,
-      following_count: followingCount
+      following_count: followingCount,
+      twizz_circle: twizzCircleUsers
     }
   }
 
@@ -453,7 +473,8 @@ class UsersService {
           email_verify_otp: 0,
           forgot_password_otp: 0,
           email_verify_otp_expires_at: 0,
-          forgot_password_otp_expires_at: 0
+          forgot_password_otp_expires_at: 0,
+          twizz_circle: 0
         }
       }
     )
@@ -497,6 +518,11 @@ class UsersService {
       userUpdate.username_changed = true
     }
 
+    // Convert twizz_circle string[] to ObjectId[]
+    if (payload.twizz_circle) {
+      userUpdate.twizz_circle = payload.twizz_circle.map((id) => new ObjectId(id))
+    }
+
     const user = await databaseService.users.findOneAndUpdate(
       { _id: new ObjectId(user_id) },
       {
@@ -516,7 +542,32 @@ class UsersService {
         }
       }
     )
-    return user
+
+    if (!user) return null
+
+    // Populate twizz_circle with user details for the frontend
+    let twizzCircleUsers: any[] = []
+    if (user.twizz_circle && user.twizz_circle.length > 0) {
+      twizzCircleUsers = await databaseService.users
+        .find(
+          { _id: { $in: user.twizz_circle } },
+          {
+            projection: {
+              _id: 1,
+              name: 1,
+              username: 1,
+              avatar: 1,
+              verify: 1
+            }
+          }
+        )
+        .toArray()
+    }
+
+    return {
+      ...user,
+      twizz_circle: twizzCircleUsers
+    }
   }
   async follow(user_id: string, followed_user_id: string) {
     const follower = await databaseService.followers.findOne({

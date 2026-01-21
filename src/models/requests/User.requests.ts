@@ -46,6 +46,7 @@ export interface UpdateMeReqBody {
   username?: string
   avatar?: string
   cover_photo?: string
+  twizz_circle?: string[]
 }
 
 export interface FollowReqBody {
