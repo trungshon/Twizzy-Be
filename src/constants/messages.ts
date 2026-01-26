@@ -133,3 +133,9 @@ export const SEARCH_MESSAGES = {
   SEARCH_TYPE_IS_INVALID: 'Loại tìm kiếm không hợp lệ (phải là "users" hoặc "twizzs")',
   SEARCH_FIELD_IS_INVALID: 'Trường tìm kiếm không hợp lệ (phải là "username" hoặc "name")'
 } as const
+
+export const CONVERSATION_MESSAGES = {
+  GET_CONVERSATION_SUCCESSFULLY: 'Lấy cuộc trò chuyện thành công',
+  GET_CONVERSATION_FAILED: 'Lấy cuộc trò chuyện thất bại'
+} as const
+

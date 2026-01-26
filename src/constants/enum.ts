@@ -29,7 +29,8 @@ export enum TwizzType {
 
 export enum TwizzAudience {
   Everyone,
-  TwizzCircle
+  TwizzCircle,
+  OnlyMe
 }
 
 export enum PeopleFollow {

@@ -10,6 +10,12 @@ import twizzsRouter from './routes/twizzs.routes'
 import bookmarksRouter from './routes/bookmarks.routes'
 import likesRouter from './routes/likes.routes'
 import searchRouter from './routes/search.routes'
+
+import { createServer } from 'http'
+
+import conversationsRouter from './routes/conversations.routes'
+import initSocket from './utils/socket'
+
 // import './utils/fake'
 
 config()
@@ -20,6 +26,7 @@ databaseService.connect().then(() => {
   databaseService.indexTwizzs()
 })
 const app = express()
+const httpServer = createServer(app)
 const PORT = process.env.PORT || 3000
 
 initFolder()
@@ -31,8 +38,12 @@ app.use('/bookmarks', bookmarksRouter)
 app.use('/likes', likesRouter)
 app.use('/search', searchRouter)
 app.use('/static', staticRouter)
+app.use('/conversations', conversationsRouter)
 // app.use('/static', express.static(UPLOAD_IMAGE_DIR))
+
 app.use(defaultErrorHandler)
-app.listen(PORT, () => {
+
+initSocket(httpServer)
+httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
 })

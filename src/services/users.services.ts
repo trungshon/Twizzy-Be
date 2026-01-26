@@ -481,13 +481,19 @@ class UsersService {
 
     if (!user) return null
 
-    const is_following = await databaseService.followers.findOne({
-      user_id: new ObjectId(current_user_id),
-      followed_user_id: user._id
-    })
+    const [is_following, is_follower] = await Promise.all([
+      databaseService.followers.findOne({
+        user_id: new ObjectId(current_user_id),
+        followed_user_id: user._id
+      }),
+      databaseService.followers.findOne({
+        user_id: user._id,
+        followed_user_id: new ObjectId(current_user_id)
+      })
+    ])
 
     const followersCount = await databaseService.followers.countDocuments({
-        followed_user_id: user._id
+      followed_user_id: user._id
     })
 
     const followingCount = await databaseService.followers.countDocuments({
@@ -497,6 +503,7 @@ class UsersService {
     return {
       ...user,
       is_following: Boolean(is_following),
+      is_follower: Boolean(is_follower),
       followers_count: followersCount,
       following_count: followingCount
     }

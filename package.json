@@ -57,6 +57,11 @@
     "mongodb": "^7.0.0",
     "nodemailer": "^7.0.12",
     "sharp": "^0.34.5",
+    "socket.io": "^4.8.3",
     "uuid": "^13.0.0"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.1.0",
+    "utf-8-validate": "^6.0.6"
   }
 }

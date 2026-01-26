@@ -297,6 +297,22 @@ export const audienceValidator = wrapRequestHandler(async (req: Request, res: Re
       })
     }
   }
+
+  if (twizz.audience === TwizzAudience.OnlyMe) {
+    if (!req.decoded_authorization) {
+      throw new ErrorWithStatus({
+        message: USER_MESSAGES.ACCESS_TOKEN_IS_REQUIRED,
+        status: HTTP_STATUS.UNAUTHORIZED
+      })
+    }
+    const { user_id } = req.decoded_authorization
+    if (!twizz.user_id.equals(new ObjectId(user_id))) {
+      throw new ErrorWithStatus({
+        message: TWIZZ_MESSAGES.TWIZZ_IS_NOT_PUBLIC,
+        status: HTTP_STATUS.FORBIDDEN
+      })
+    }
+  }
   next()
 })
 

@@ -16,6 +16,7 @@ import { ParamSchema } from 'express-validator/lib/middlewares/schema'
 import { isOTPExpired } from '~/utils/otp'
 import { TokenPayload } from '~/models/requests/User.requests'
 import { REGEX_USERNAME } from '~/constants/regex'
+import { verifyAccessToken } from '~/utils/commons'
 
 const nameSchema: ParamSchema = {
   isString: {
@@ -283,25 +284,7 @@ export const accessTokenValidator = validate(
         custom: {
           options: async (value: string, { req }) => {
             const access_token = (value || '').split(' ')[1]
-            if (!access_token) {
-              throw new ErrorWithStatus({
-                message: USER_MESSAGES.ACCESS_TOKEN_IS_REQUIRED,
-                status: HTTP_STATUS.UNAUTHORIZED
-              })
-            }
-            try {
-              const decoded_authorization = await verifyToken({
-                token: access_token,
-                secretOrPublicKey: process.env.JWT_SECRET_ACCESS_TOKEN as string
-              })
-              ;(req as Request).decoded_authorization = decoded_authorization
-            } catch (error) {
-              throw new ErrorWithStatus({
-                message: capitalize((error as JsonWebTokenError).message),
-                status: HTTP_STATUS.UNAUTHORIZED
-              })
-            }
-            return true
+            return await verifyAccessToken(access_token, req as Request)
           }
         }
       }
@@ -589,6 +572,15 @@ export const unfollowValidator = validate(
   checkSchema(
     {
       user_id: userIdSchema
+    },
+    ['params']
+  )
+)
+
+export const getConversationsValidator = validate(
+  checkSchema(
+    {
+      receiver_id: userIdSchema
     },
     ['params']
   )

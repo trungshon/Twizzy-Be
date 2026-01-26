@@ -1137,12 +1137,15 @@ class TwizzsService {
             $match: {
               $or: [
                 {
-                  audience: 0
+                  audience: TwizzAudience.Everyone
+                },
+                {
+                  user_id: user_id_objectId
                 },
                 {
                   $and: [
                     {
-                      audience: 1
+                      audience: TwizzAudience.TwizzCircle
                     },
                     {
                       'user.twizz_circle': {
@@ -1604,8 +1607,9 @@ class TwizzsService {
   }
 
   async deleteTwizz(user_id: string, twizz_id: string) {
+    const twizzIdObj = new ObjectId(twizz_id)
     const twizz = await databaseService.twizzs.findOne({
-      _id: new ObjectId(twizz_id)
+      _id: twizzIdObj
     })
 
     if (!twizz) {
@@ -1623,13 +1627,34 @@ class TwizzsService {
       })
     }
 
-    // Delete the twizz and its children
+    // Find all descendant IDs recursively
+    const allIdsToDelete: ObjectId[] = [twizzIdObj]
+    const queue: ObjectId[] = [twizzIdObj]
+
+    while (queue.length > 0) {
+      const currentParentId = queue.shift() as ObjectId
+      const children = await databaseService.twizzs
+        .find({ parent_id: currentParentId })
+        .project({ _id: 1 })
+        .toArray()
+
+      if (children.length > 0) {
+        const childIds = children.map((child) => child._id)
+        allIdsToDelete.push(...childIds)
+        queue.push(...childIds)
+      }
+    }
+
+    // Delete the twizzs and associated data (likes, bookmarks)
     await Promise.all([
-      databaseService.twizzs.deleteOne({
-        _id: new ObjectId(twizz_id)
-      }),
       databaseService.twizzs.deleteMany({
-        parent_id: new ObjectId(twizz_id)
+        _id: { $in: allIdsToDelete }
+      }),
+      databaseService.likes.deleteMany({
+        twizz_id: { $in: allIdsToDelete }
+      }),
+      databaseService.bookmarks.deleteMany({
+        twizz_id: { $in: allIdsToDelete }
       })
     ])
 
