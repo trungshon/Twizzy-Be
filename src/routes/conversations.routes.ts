@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { acceptConversationController, deleteConversationController, getConversationsController, getConversationsListController } from '~/controllers/conservations.controllers'
+import { acceptConversationController, deleteConversationController, getConversationsController, getConversationsListController, markAsReadController } from '~/controllers/conservations.controllers'
 import { paginationValidator } from '~/middlewares/twizzs.middlewares'
 import { accessTokenValidator, getConversationsValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
@@ -33,5 +33,12 @@ conversationsRouter.put('/receivers/:sender_id/accept', accessTokenValidator, ve
  * @method DELETE
  */
 conversationsRouter.delete('/receivers/:sender_id/delete', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(deleteConversationController))
+
+/**
+ * @description Mark as read
+ * @path /receivers/:sender_id/mark-as-read
+ * @method PATCH
+ */
+conversationsRouter.patch('/receivers/:sender_id/mark-as-read', accessTokenValidator, verifiedUserValidator, wrapRequestHandler(markAsReadController))
 
 export default conversationsRouter

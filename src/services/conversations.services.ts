@@ -43,6 +43,19 @@ class ConversationsService {
         })
     }
 
+    async markAsRead({ user_id, sender_id }: { user_id: string, sender_id: string }) {
+        await databaseService.conversations.updateMany(
+            {
+                sender_id: new ObjectId(sender_id),
+                receiver_id: new ObjectId(user_id),
+                is_read: false
+            },
+            {
+                $set: { is_read: true }
+            }
+        )
+    }
+
     async getConversationsList(user_id: string) {
         const userId = new ObjectId(user_id)
         const result = await databaseService.conversations.aggregate([

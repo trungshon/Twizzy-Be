@@ -47,3 +47,12 @@ export const deleteConversationController = async (req: Request, res: Response) 
         message: 'Delete conversation successfully'
     })
 }
+
+export const markAsReadController = async (req: Request, res: Response) => {
+    const user_id = req.decoded_authorization?.user_id as string
+    const { sender_id } = req.params
+    await conversationsService.markAsRead({ user_id, sender_id })
+    return res.json({
+        message: 'Mark as read successfully'
+    })
+}
