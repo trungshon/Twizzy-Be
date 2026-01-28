@@ -3,6 +3,7 @@ import conversationsService from '~/services/conversations.services'
 import { TokenPayload } from '~/models/requests/User.requests'
 import { CONVERSATION_MESSAGES } from '~/constants/messages'
 import { GetConversationsParams } from '~/models/requests/Conversation.requests'
+import { io, users } from '~/utils/socket'
 
 export const getConversationsController = async (req: Request<GetConversationsParams>, res: Response) => {
     const limit = Number(req.query.limit)
@@ -52,6 +53,15 @@ export const markAsReadController = async (req: Request, res: Response) => {
     const user_id = req.decoded_authorization?.user_id as string
     const { sender_id } = req.params
     await conversationsService.markAsRead({ user_id, sender_id })
+
+    // Notify the sender that their messages have been read
+    const sender_socket_id = users[sender_id]?.socket_id
+    if (sender_socket_id) {
+        io.to(sender_socket_id).emit('messages_read', {
+            receiver_id: user_id
+        })
+    }
+
     return res.json({
         message: 'Mark as read successfully'
     })

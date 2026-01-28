@@ -10,16 +10,17 @@ import databaseService from "~/services/database.services"
 import { verifyAccessToken } from "./commons"
 import { Server } from "socket.io"
 
+export let io: Server
+export const users: {
+    [key: string]: { socket_id: string }
+} = {}
+
 const initSocket = (httpServer: ServerHttp) => {
-    const io = new Server(httpServer, {
+    io = new Server(httpServer, {
         cors: {
             origin: 'http://localhost:3000'
         },
     })
-
-    const users: {
-        [key: string]: { socket_id: string }
-    } = {}
 
     io.use(async (socket, next) => {
         const { Authorization } = socket.handshake.auth
