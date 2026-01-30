@@ -37,8 +37,17 @@ export const createTwizzValidator = validate(
           const type = req.body.type as TwizzType
           // Nếu `type` là comment, quotetwizz thì `parent_id`
           // phải là `twizz_id` của twizz cha
-          if ([TwizzType.Comment, TwizzType.QuoteTwizz].includes(type) && !ObjectId.isValid(value)) {
-            throw new Error(TWIZZ_MESSAGES.INVALID_PARENT_ID)
+          if ([TwizzType.Comment, TwizzType.QuoteTwizz].includes(type)) {
+            if (!ObjectId.isValid(value)) {
+              throw new Error(TWIZZ_MESSAGES.INVALID_PARENT_ID)
+            }
+            const parentTwizz = await databaseService.twizzs.findOne({ _id: new ObjectId(value) })
+            if (!parentTwizz) {
+              throw new Error(TWIZZ_MESSAGES.TWIZZ_NOT_EXISTS)
+            }
+            if (type === TwizzType.QuoteTwizz && parentTwizz.type === TwizzType.Comment) {
+              throw new Error(TWIZZ_MESSAGES.CANNOT_QUOTE_COMMENT)
+            }
           }
           // Nếu `type` là twizz thì `parent_id` phải là null
           if (type === TwizzType.Twizz && value !== null) {
@@ -259,7 +268,7 @@ export const twizzIdValidator = validate(
                 status: HTTP_STATUS.NOT_FOUND
               })
             }
-            ;(req as Request).twizz = twizz
+            ; (req as Request).twizz = twizz
             return true
           }
         }

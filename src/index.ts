@@ -10,6 +10,7 @@ import twizzsRouter from './routes/twizzs.routes'
 import bookmarksRouter from './routes/bookmarks.routes'
 import likesRouter from './routes/likes.routes'
 import searchRouter from './routes/search.routes'
+import notificationsRouter from './routes/notifications.routes'
 
 import { createServer } from 'http'
 
@@ -39,6 +40,7 @@ app.use('/likes', likesRouter)
 app.use('/search', searchRouter)
 app.use('/static', staticRouter)
 app.use('/conversations', conversationsRouter)
+app.use('/notifications', notificationsRouter)
 // app.use('/static', express.static(UPLOAD_IMAGE_DIR))
 
 app.use(defaultErrorHandler)

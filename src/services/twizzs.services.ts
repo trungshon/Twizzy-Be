@@ -3,7 +3,8 @@ import databaseService from './database.services'
 import Twizz from '~/models/schemas/Twizz.schema'
 import { ObjectId, WithId } from 'mongodb'
 import Hashtag from '~/models/schemas/Hashtag.schema'
-import { TwizzAudience, TwizzType } from '~/constants/enum'
+import { NotificationType, TwizzAudience, TwizzType } from '~/constants/enum'
+import notificationsService from './notifications.services'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { ErrorWithStatus } from '~/models/Errors'
 import { TWIZZ_MESSAGES } from '~/constants/messages'
@@ -295,7 +296,22 @@ class TwizzsService {
         }
       ])
       .toArray()
-    return twizzs[0]
+    const finalResult = twizzs[0]
+
+    // Trigger notification for Comment or QuoteTwizz
+    if (finalResult.parent_id && (finalResult.type === TwizzType.Comment || finalResult.type === TwizzType.QuoteTwizz)) {
+      const parentTwizz = await databaseService.twizzs.findOne({ _id: finalResult.parent_id })
+      if (parentTwizz && parentTwizz.user_id.toString() !== user_id) {
+        await notificationsService.createNotification({
+          user_id: parentTwizz.user_id.toString(),
+          sender_id: user_id,
+          type: finalResult.type === TwizzType.Comment ? NotificationType.Comment : NotificationType.QuoteTwizz,
+          twizz_id: finalResult.type === TwizzType.Comment ? finalResult.parent_id.toString() : finalResult._id.toString()
+        })
+      }
+    }
+
+    return finalResult
   }
 
   async increaseView(twizz_id: string, user_id?: string) {
@@ -1417,37 +1433,37 @@ class TwizzsService {
                 },
                 ...(viewer_user_id_objectId
                   ? [
-                      {
-                        $lookup: {
-                          from: 'likes',
-                          localField: '_id',
-                          foreignField: 'twizz_id',
-                          as: 'user_likes',
-                          pipeline: [
-                            {
-                              $match: {
-                                user_id: viewer_user_id_objectId
-                              }
+                    {
+                      $lookup: {
+                        from: 'likes',
+                        localField: '_id',
+                        foreignField: 'twizz_id',
+                        as: 'user_likes',
+                        pipeline: [
+                          {
+                            $match: {
+                              user_id: viewer_user_id_objectId
                             }
-                          ]
-                        }
-                      },
-                      {
-                        $lookup: {
-                          from: 'bookmarks',
-                          localField: '_id',
-                          foreignField: 'twizz_id',
-                          as: 'user_bookmarks',
-                          pipeline: [
-                            {
-                              $match: {
-                                user_id: viewer_user_id_objectId
-                              }
-                            }
-                          ]
-                        }
+                          }
+                        ]
                       }
-                    ]
+                    },
+                    {
+                      $lookup: {
+                        from: 'bookmarks',
+                        localField: '_id',
+                        foreignField: 'twizz_id',
+                        as: 'user_bookmarks',
+                        pipeline: [
+                          {
+                            $match: {
+                              user_id: viewer_user_id_objectId
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
                   : []),
                 {
                   $addFields: {
@@ -1509,12 +1525,12 @@ class TwizzsService {
               as: 'user_likes',
               pipeline: viewer_user_id_objectId
                 ? [
-                    {
-                      $match: {
-                        user_id: viewer_user_id_objectId
-                      }
+                  {
+                    $match: {
+                      user_id: viewer_user_id_objectId
                     }
-                  ]
+                  }
+                ]
                 : []
             }
           },
@@ -1526,12 +1542,12 @@ class TwizzsService {
               as: 'user_bookmarks',
               pipeline: viewer_user_id_objectId
                 ? [
-                    {
-                      $match: {
-                        user_id: viewer_user_id_objectId
-                      }
+                  {
+                    $match: {
+                      user_id: viewer_user_id_objectId
                     }
-                  ]
+                  }
+                ]
                 : []
             }
           },

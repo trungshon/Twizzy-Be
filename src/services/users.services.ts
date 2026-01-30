@@ -3,7 +3,8 @@ import databaseService from './database.services'
 import { RegisterReqBody, UpdateMeReqBody } from '~/models/requests/User.requests'
 import { hashPassword } from '~/utils/crypto'
 import { signToken, verifyToken } from '~/utils/jwt'
-import { TokenType, UserVerifyStatus } from '~/constants/enum'
+import { NotificationType, TokenType, UserVerifyStatus } from '~/constants/enum'
+import notificationsService from './notifications.services'
 import RefreshToken from '~/models/schemas/RefreshToken.schema'
 import { ObjectId } from 'mongodb'
 import { config } from 'dotenv'
@@ -588,6 +589,12 @@ class UsersService {
           followed_user_id: new ObjectId(followed_user_id)
         })
       )
+      // Trigger notification
+      await notificationsService.createNotification({
+        user_id: followed_user_id,
+        sender_id: user_id,
+        type: NotificationType.Follow
+      })
       return { message: USER_MESSAGES.FOLLOW_SUCCESSFULLY }
     }
     return { message: USER_MESSAGES.FOLLOWED_ALREADY }

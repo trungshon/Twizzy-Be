@@ -108,7 +108,8 @@ export const TWIZZ_MESSAGES = {
   MEDIAS_MUST_BE_AN_ARRAY_OF_MEDIA_OBJECTS: 'Medias phải là một mảng các Media Object',
   INVALID_TWIZZ_TYPE: 'Loại bài viết không hợp lệ',
   LIMIT_MUST_BE_BETWEEN_1_AND_100: 'Số lượng bài viết con phải từ 1 đến 100',
-  PAGE_MUST_BE_AT_LEAST_1: 'Trang phải lớn hơn hoặc bằng 1'
+  PAGE_MUST_BE_AT_LEAST_1: 'Trang phải lớn hơn hoặc bằng 1',
+  CANNOT_QUOTE_COMMENT: 'Không thể quote bình luận'
 } as const
 
 export const BOOKMARK_MESSAGES = {
