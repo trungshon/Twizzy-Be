@@ -311,6 +311,22 @@ class TwizzsService {
       }
     }
 
+    // Trigger notification for Mentions
+    if (finalResult.mentions && finalResult.mentions.length > 0) {
+      await Promise.all(
+        finalResult.mentions.map((mention: any) => {
+          if (mention._id.toString() !== user_id) {
+            return notificationsService.createNotification({
+              user_id: mention._id.toString(),
+              sender_id: user_id,
+              type: NotificationType.Mention,
+              twizz_id: finalResult._id.toString()
+            })
+          }
+        })
+      )
+    }
+
     return finalResult
   }
 

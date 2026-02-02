@@ -42,5 +42,6 @@ export enum NotificationType {
   Like,
   Comment,
   QuoteTwizz,
-  Follow
+  Follow,
+  Mention
 }
