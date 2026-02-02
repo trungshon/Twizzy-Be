@@ -45,3 +45,8 @@ export enum NotificationType {
   Follow,
   Mention
 }
+
+export enum UserRole {
+  User,
+  Admin
+}

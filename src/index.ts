@@ -1,4 +1,5 @@
 import express from 'express'
+import cors from 'cors'
 import usersRouter from './routes/users.routes'
 import databaseService from './services/database.services'
 import defaultErrorHandler from './middlewares/error.middlewares'
@@ -11,6 +12,8 @@ import bookmarksRouter from './routes/bookmarks.routes'
 import likesRouter from './routes/likes.routes'
 import searchRouter from './routes/search.routes'
 import notificationsRouter from './routes/notifications.routes'
+import adminRouter from './routes/admin.routes'
+import path from 'path'
 
 import { createServer } from 'http'
 
@@ -31,6 +34,7 @@ const httpServer = createServer(app)
 const PORT = process.env.PORT || 3000
 
 initFolder()
+app.use(cors())
 app.use(express.json())
 app.use('/users', usersRouter)
 app.use('/medias', mediasRouter)
@@ -41,7 +45,13 @@ app.use('/search', searchRouter)
 app.use('/static', staticRouter)
 app.use('/conversations', conversationsRouter)
 app.use('/notifications', notificationsRouter)
-// app.use('/static', express.static(UPLOAD_IMAGE_DIR))
+app.use('/admin', adminRouter)
+
+// Serve admin web static files
+app.use('/admin-web', express.static(path.join(__dirname, '../admin')))
+app.get('/admin-web/{*path}', (req, res) => {
+  res.sendFile(path.join(__dirname, '../admin', 'index.html'))
+})
 
 app.use(defaultErrorHandler)
 
@@ -49,3 +59,4 @@ initSocket(httpServer)
 httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
 })
+

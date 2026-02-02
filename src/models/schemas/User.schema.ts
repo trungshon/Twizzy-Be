@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb'
-import { UserVerifyStatus } from '~/constants/enum'
+import { UserVerifyStatus, UserRole } from '~/constants/enum'
 
 interface UserType {
   _id?: ObjectId
@@ -26,6 +26,7 @@ interface UserType {
   avatar?: string
   cover_photo?: string
   username_changed?: boolean
+  role?: UserRole
 }
 
 export default class User {
@@ -53,6 +54,7 @@ export default class User {
   avatar: string
   cover_photo: string
   username_changed: boolean
+  role: UserRole
 
   constructor(user: UserType) {
     const date = new Date()
@@ -79,6 +81,7 @@ export default class User {
     this.avatar = user.avatar || ''
     this.cover_photo = user.cover_photo || ''
     this.username_changed = user.username_changed || false
+    this.role = user.role ?? UserRole.User
   }
 }
 
