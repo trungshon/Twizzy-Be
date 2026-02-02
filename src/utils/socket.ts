@@ -98,15 +98,32 @@ const initSocket = (httpServer: ServerHttp) => {
             })
             const result = await databaseService.conversations.insertOne(conversation)
             conversation._id = result.insertedId
+
+            // Fetch sender info for the notification
+            const sender = await databaseService.users.findOne(
+                { _id: new ObjectId(sender_id) },
+                {
+                    projection: {
+                        password: 0,
+                        email_verify_token: 0,
+                        forgot_password_token: 0,
+                        twizz_circle: 0
+                    }
+                }
+            )
+
+            const messagePayload = {
+                payload: {
+                    ...conversation,
+                    sender: sender
+                }
+            }
+
             if (receiver_socket_id) {
-                socket.to(receiver_socket_id).emit('receive_message', {
-                    payload: conversation,
-                })
+                socket.to(receiver_socket_id).emit('receive_message', messagePayload)
             }
             // Also emit back to the sender for confirmation/UI update
-            socket.emit('receive_message', {
-                payload: conversation,
-            })
+            socket.emit('receive_message', messagePayload)
         })
         socket.on('disconnect', () => {
             delete users[user_id]
