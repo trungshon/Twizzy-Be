@@ -19,6 +19,7 @@ import { createServer } from 'http'
 
 import conversationsRouter from './routes/conversations.routes'
 import initSocket from './utils/socket'
+import reportsRouter from './routes/reports.routes'
 
 // import './utils/fake'
 
@@ -46,6 +47,7 @@ app.use('/static', staticRouter)
 app.use('/conversations', conversationsRouter)
 app.use('/notifications', notificationsRouter)
 app.use('/admin', adminRouter)
+app.use('/reports', reportsRouter)
 
 // Serve admin web static files
 app.use('/admin-web', express.static(path.join(__dirname, '../admin')))

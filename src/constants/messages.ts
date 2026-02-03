@@ -82,7 +82,8 @@ export const USER_MESSAGES = {
   UPLOAD_IMAGE_SUCCESSFULLY: 'Tải lên ảnh thành công',
   UPLOAD_VIDEO_SUCCESSFULLY: 'Tải lên video thành công',
   GET_FOLLOWERS_SUCCESSFULLY: 'Lấy danh sách người theo dõi thành công',
-  GET_FOLLOWING_SUCCESSFULLY: 'Lấy danh sách đang theo dõi thành công'
+  GET_FOLLOWING_SUCCESSFULLY: 'Lấy danh sách đang theo dõi thành công',
+  ADMIN_PERMISSION_REQUIRED: 'Yêu cầu quyền quản trị viên'
 } as const
 
 export const TWIZZ_MESSAGES = {

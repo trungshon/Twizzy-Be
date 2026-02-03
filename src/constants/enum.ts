@@ -50,3 +50,18 @@ export enum UserRole {
   User,
   Admin
 }
+
+export enum ReportReason {
+  Spam,
+  Harassment,
+  HateSpeech,
+  Violence,
+  Nudity,
+  Other
+}
+
+export enum ReportStatus {
+  Pending,
+  Resolved,
+  Ignored
+}

@@ -10,7 +10,7 @@ import { HTTP_STATUS } from '~/constants/httpStatus'
 import { JsonWebTokenError } from 'jsonwebtoken'
 import { capitalize } from 'lodash'
 import { NextFunction, Request, Response } from 'express'
-import { TokenType, UserVerifyStatus } from '~/constants/enum'
+import { TokenType, UserVerifyStatus, UserRole } from '~/constants/enum'
 import { ObjectId } from 'mongodb'
 import { ParamSchema } from 'express-validator/lib/middlewares/schema'
 import { isOTPExpired } from '~/utils/otp'
@@ -155,9 +155,11 @@ const forgotPasswordOTPSchema: ParamSchema = {
         })
       }
       // Store user_id in request for controller
-      ;(req as Request).decoded_forgot_password_otp = {
+      ; (req as Request).decoded_forgot_password_otp = {
         user_id: user._id?.toString() || '',
-        token_type: TokenType.ForgotPasswordToken
+        token_type: TokenType.ForgotPasswordToken,
+        verify: user.verify,
+        role: user.role
       }
       return true
     }
@@ -317,7 +319,7 @@ export const refreshTokenValidator = validate(
                   status: HTTP_STATUS.UNAUTHORIZED
                 })
               }
-              ;(req as Request).decoded_refresh_token = decoded_refresh_token
+              ; (req as Request).decoded_refresh_token = decoded_refresh_token
               const user = await databaseService.users.findOne({ _id: new ObjectId(decoded_refresh_token.user_id) })
               if (!user) {
                 throw new ErrorWithStatus({
@@ -325,7 +327,7 @@ export const refreshTokenValidator = validate(
                   status: HTTP_STATUS.NOT_FOUND
                 })
               }
-              ;(req as Request).user = user
+              ; (req as Request).user = user
             } catch (error) {
               if (error instanceof JsonWebTokenError) {
                 throw new ErrorWithStatus({
@@ -397,9 +399,11 @@ export const emailVerifyOTPValidator = validate(
               })
             }
             // Store user_id in request for controller
-            ;(req as Request).decoded_email_verify_otp = {
+            ; (req as Request).decoded_email_verify_otp = {
               user_id: user._id?.toString() || '',
-              token_type: TokenType.EmailVerifyToken
+              token_type: TokenType.EmailVerifyToken,
+              verify: user.verify,
+              role: user.role
             }
             return true
           }
@@ -655,4 +659,17 @@ export const isUserLoggedInValidator = (middleware: (req: Request, res: Response
     }
     next()
   }
+}
+
+export const adminValidator = (req: Request, res: Response, next: NextFunction) => {
+  const { role } = req.decoded_authorization as TokenPayload
+  if (role !== UserRole.Admin) {
+    return next(
+      new ErrorWithStatus({
+        message: USER_MESSAGES.ADMIN_PERMISSION_REQUIRED || 'Admin permission required',
+        status: HTTP_STATUS.FORBIDDEN
+      })
+    )
+  }
+  next()
 }

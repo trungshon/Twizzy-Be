@@ -9,6 +9,7 @@ import Bookmark from '~/models/schemas/Bookmark.schema'
 import Like from '~/models/schemas/Like.schema'
 import Conversation from '~/models/schemas/Conversations.schema'
 import Notification from '~/models/schemas/Notification.schema'
+import Report from '~/models/schemas/Report.schema'
 config()
 
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@twizzy.glhnqkl.mongodb.net/?appName=Twizzy`
@@ -95,6 +96,10 @@ class DatabaseService {
 
   get notifications(): Collection<Notification> {
     return this.db.collection(process.env.DB_NOTIFICATIONS_COLLECTION as string)
+  }
+
+  get reports(): Collection<Report> {
+    return this.db.collection(process.env.DB_REPORTS_COLLECTION as string)
   }
 }
 

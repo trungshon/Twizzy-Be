@@ -30,7 +30,11 @@ config()
 export const loginController = async (req: Request, res: Response) => {
   const user = req.user as User
   const user_id = user._id as ObjectId
-  const result = await usersService.login({ user_id: user_id.toString(), verify: user.verify })
+  const result = await usersService.login({
+    user_id: user_id.toString(),
+    verify: user.verify,
+    role: user.role
+  })
   return res.json({
     message: USER_MESSAGES.LOGIN_SUCCESSFULLY,
     result
@@ -90,7 +94,10 @@ export const refreshTokenController = async (req: Request, res: Response) => {
   const { refresh_token } = req.body
   const user_id = decoded_refresh_token?.user_id as string
   const exp = decoded_refresh_token?.exp as number
-  const result = await usersService.refreshToken({ user_id, verify: user.verify, exp }, refresh_token)
+  const result = await usersService.refreshToken(
+    { user_id, verify: user.verify, role: user.role, exp },
+    refresh_token
+  )
   return res.json({
     message: USER_MESSAGES.REFRESH_TOKEN_SUCCESSFULLY,
     result
