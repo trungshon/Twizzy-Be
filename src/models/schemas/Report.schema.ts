@@ -8,6 +8,9 @@ interface ReportConstructor {
     reason: ReportReason
     description?: string
     status?: ReportStatus
+    action?: string
+    admin_id?: ObjectId
+    twizz_snapshot?: any
     created_at?: Date
     updated_at?: Date
 }
@@ -19,6 +22,9 @@ export default class Report {
     reason: ReportReason
     description: string
     status: ReportStatus
+    action?: string
+    admin_id?: ObjectId
+    twizz_snapshot?: any
     created_at: Date
     updated_at: Date
 
@@ -29,6 +35,9 @@ export default class Report {
         reason,
         description,
         status,
+        action,
+        admin_id,
+        twizz_snapshot,
         created_at,
         updated_at
     }: ReportConstructor) {
@@ -39,6 +48,9 @@ export default class Report {
         this.reason = reason
         this.description = description || ''
         this.status = status || ReportStatus.Pending
+        this.action = action
+        this.admin_id = admin_id
+        this.twizz_snapshot = twizz_snapshot
         this.created_at = created_at || date
         this.updated_at = updated_at || date
     }

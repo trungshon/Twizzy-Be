@@ -10,6 +10,7 @@ class NotificationsService {
         sender_id: string // Trigger user
         type: NotificationType
         twizz_id?: string
+        metadata?: any
     }) {
         const filter: any = {
             user_id: new ObjectId(payload.user_id),
@@ -23,11 +24,15 @@ class NotificationsService {
             filter.twizz_id = { $exists: false }
         }
 
-        const update = {
+        const update: any = {
             $set: {
                 is_read: false,
                 created_at: new Date()
             }
+        }
+
+        if (payload.metadata) {
+            update.$set.metadata = payload.metadata
         }
 
         const result = await databaseService.notifications.findOneAndUpdate(filter, update, {

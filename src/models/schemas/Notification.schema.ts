@@ -7,6 +7,7 @@ interface NotificationConstructor {
     sender_id: ObjectId // Trigger user
     type: NotificationType
     twizz_id?: ObjectId // Optional, for Like/Comment/Quote
+    metadata?: any // Flexible metadata for different notification types
     is_read?: boolean
     created_at?: Date
 }
@@ -17,15 +18,17 @@ export default class Notification {
     sender_id: ObjectId
     type: NotificationType
     twizz_id?: ObjectId
+    metadata?: any
     is_read: boolean
     created_at: Date
 
-    constructor({ _id, user_id, sender_id, type, twizz_id, is_read, created_at }: NotificationConstructor) {
+    constructor({ _id, user_id, sender_id, type, twizz_id, metadata, is_read, created_at }: NotificationConstructor) {
         this._id = _id
         this.user_id = user_id
         this.sender_id = sender_id
         this.type = type
         this.twizz_id = twizz_id
+        this.metadata = metadata
         this.is_read = is_read || false
         this.created_at = created_at || new Date()
     }

@@ -43,7 +43,11 @@ export enum NotificationType {
   Comment,
   QuoteTwizz,
   Follow,
-  Mention
+  Mention,
+  ReportResolved,
+  ReportIgnored,
+  PostDeleted,
+  AccountBanned
 }
 
 export enum UserRole {

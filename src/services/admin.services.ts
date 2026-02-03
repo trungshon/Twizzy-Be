@@ -179,14 +179,19 @@ class AdminService {
 
     // Update user verify status
     async updateUserStatus(user_id: string, verify: UserVerifyStatus) {
+        const updateData: any = {
+            verify,
+            updated_at: new Date()
+        }
+
+        // Reset violation count if unbanning (not setting to banned)
+        if (verify !== UserVerifyStatus.Banned) {
+            updateData.violation_count = 0
+        }
+
         const result = await databaseService.users.updateOne(
             { _id: new ObjectId(user_id) },
-            {
-                $set: {
-                    verify,
-                    updated_at: new Date()
-                }
-            }
+            { $set: updateData }
         )
         return result.modifiedCount > 0
     }
@@ -289,13 +294,29 @@ class AdminService {
     async deleteTwizz(twizz_id: string) {
         const objectId = new ObjectId(twizz_id)
 
-        // Delete twizz and related data
+        // Find all descendant IDs recursively
+        const allIdsToDelete: ObjectId[] = [objectId]
+        const queue: ObjectId[] = [objectId]
+
+        while (queue.length > 0) {
+            const currentParentId = queue.shift() as ObjectId
+            const children = await databaseService.twizzs
+                .find({ parent_id: currentParentId })
+                .project({ _id: 1 })
+                .toArray()
+
+            if (children.length > 0) {
+                const childIds = children.map((child) => child._id)
+                allIdsToDelete.push(...childIds)
+                queue.push(...childIds)
+            }
+        }
+
+        // Delete twizzs and related data
         await Promise.all([
-            databaseService.twizzs.deleteOne({ _id: objectId }),
-            databaseService.likes.deleteMany({ twizz_id: objectId }),
-            databaseService.bookmarks.deleteMany({ twizz_id: objectId }),
-            // Delete comments (twizzs with parent_id = this twizz)
-            databaseService.twizzs.deleteMany({ parent_id: objectId })
+            databaseService.twizzs.deleteMany({ _id: { $in: allIdsToDelete } }),
+            databaseService.likes.deleteMany({ twizz_id: { $in: allIdsToDelete } }),
+            databaseService.bookmarks.deleteMany({ twizz_id: { $in: allIdsToDelete } })
         ])
 
         return true

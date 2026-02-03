@@ -27,6 +27,7 @@ interface UserType {
   cover_photo?: string
   username_changed?: boolean
   role?: UserRole
+  violation_count?: number
 }
 
 export default class User {
@@ -55,6 +56,7 @@ export default class User {
   cover_photo: string
   username_changed: boolean
   role: UserRole
+  violation_count: number
 
   constructor(user: UserType) {
     const date = new Date()
@@ -82,6 +84,7 @@ export default class User {
     this.cover_photo = user.cover_photo || ''
     this.username_changed = user.username_changed || false
     this.role = user.role ?? UserRole.User
+    this.violation_count = user.violation_count || 0
   }
 }
 
