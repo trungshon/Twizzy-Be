@@ -120,6 +120,285 @@ class ReportsService {
         }
     }
 
+    async getMyReports({
+        user_id,
+        page = 1,
+        limit = 10
+    }: {
+        user_id: string
+        page?: number
+        limit?: number
+    }) {
+        const filter = { user_id: new ObjectId(user_id) }
+
+        const [reports, total] = await Promise.all([
+            databaseService.reports
+                .aggregate([
+                    { $match: filter },
+                    { $sort: { created_at: -1 } },
+                    { $skip: (page - 1) * limit },
+                    { $limit: limit },
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'twizz_id',
+                            foreignField: '_id',
+                            as: 'twizz'
+                        }
+                    },
+                    { $unwind: { path: '$twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            twizz: { $ifNull: ['$twizz', '$twizz_snapshot'] }
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'twizz.user_id',
+                            foreignField: '_id',
+                            as: 'twizz_user'
+                        }
+                    },
+                    { $unwind: { path: '$twizz_user', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            'twizz.user': { $ifNull: ['$twizz_user', '$twizz.user'] }
+                        }
+                    },
+                    // Lookup parent_twizz for nested twizz
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'twizz.parent_id',
+                            foreignField: '_id',
+                            as: 'parent_twizz'
+                        }
+                    },
+                    { $unwind: { path: '$parent_twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'parent_twizz.user_id',
+                            foreignField: '_id',
+                            as: 'parent_user'
+                        }
+                    },
+                    { $unwind: { path: '$parent_user', preserveNullAndEmptyArrays: true } },
+                    // Lookup grandparent_twizz (parent of parent) for nested quotes
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'parent_twizz.parent_id',
+                            foreignField: '_id',
+                            as: 'grandparent_twizz'
+                        }
+                    },
+                    { $unwind: { path: '$grandparent_twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'grandparent_twizz.user_id',
+                            foreignField: '_id',
+                            as: 'grandparent_user'
+                        }
+                    },
+                    { $unwind: { path: '$grandparent_user', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            'twizz.parent_twizz': {
+                                $cond: {
+                                    if: { $ne: ['$parent_twizz', null] },
+                                    then: {
+                                        $mergeObjects: [
+                                            '$parent_twizz',
+                                            { user: '$parent_user' },
+                                            {
+                                                parent_twizz: {
+                                                    $cond: {
+                                                        if: { $ne: ['$grandparent_twizz', null] },
+                                                        then: { $mergeObjects: ['$grandparent_twizz', { user: '$grandparent_user' }] },
+                                                        else: '$$REMOVE'
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    else: '$$REMOVE'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $project: {
+                            twizz_user: 0,
+                            parent_twizz: 0,
+                            parent_user: 0,
+                            grandparent_twizz: 0,
+                            grandparent_user: 0
+                        }
+                    }
+                ])
+                .toArray(),
+            databaseService.reports.countDocuments(filter)
+        ])
+
+        return {
+            reports,
+            pagination: {
+                page,
+                limit,
+                total,
+                total_pages: Math.ceil(total / limit)
+            }
+        }
+    }
+
+    async getReportsAgainstMe({
+        user_id,
+        page = 1,
+        limit = 10
+    }: {
+        user_id: string
+        page?: number
+        limit?: number
+    }) {
+        // Filter by twizz_snapshot.user_id - this works even if twizz is deleted
+        // because the snapshot contains the original user_id
+        const filter = { 'twizz_snapshot.user_id': new ObjectId(user_id) }
+
+        const [reports, total] = await Promise.all([
+            databaseService.reports
+                .aggregate([
+                    { $match: filter },
+                    { $sort: { created_at: -1 } },
+                    { $skip: (page - 1) * limit },
+                    { $limit: limit },
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'twizz_id',
+                            foreignField: '_id',
+                            as: 'twizz'
+                        }
+                    },
+                    { $unwind: { path: '$twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            twizz: { $ifNull: ['$twizz', '$twizz_snapshot'] }
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'twizz.user_id',
+                            foreignField: '_id',
+                            as: 'twizz_user'
+                        }
+                    },
+                    { $unwind: { path: '$twizz_user', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            'twizz.user': { $ifNull: ['$twizz_user', '$twizz.user'] }
+                        }
+                    },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'user_id',
+                            foreignField: '_id',
+                            as: 'reporter'
+                        }
+                    },
+                    { $unwind: { path: '$reporter', preserveNullAndEmptyArrays: true } },
+                    // Lookup parent_twizz for nested twizz
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'twizz.parent_id',
+                            foreignField: '_id',
+                            as: 'parent_twizz'
+                        }
+                    },
+                    { $unwind: { path: '$parent_twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'parent_twizz.user_id',
+                            foreignField: '_id',
+                            as: 'parent_user'
+                        }
+                    },
+                    { $unwind: { path: '$parent_user', preserveNullAndEmptyArrays: true } },
+                    // Lookup grandparent_twizz (parent of parent) for nested quotes
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'parent_twizz.parent_id',
+                            foreignField: '_id',
+                            as: 'grandparent_twizz'
+                        }
+                    },
+                    { $unwind: { path: '$grandparent_twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'grandparent_twizz.user_id',
+                            foreignField: '_id',
+                            as: 'grandparent_user'
+                        }
+                    },
+                    { $unwind: { path: '$grandparent_user', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            'twizz.parent_twizz': {
+                                $cond: {
+                                    if: { $ne: ['$parent_twizz', null] },
+                                    then: {
+                                        $mergeObjects: [
+                                            '$parent_twizz',
+                                            { user: '$parent_user' },
+                                            {
+                                                parent_twizz: {
+                                                    $cond: {
+                                                        if: { $ne: ['$grandparent_twizz', null] },
+                                                        then: { $mergeObjects: ['$grandparent_twizz', { user: '$grandparent_user' }] },
+                                                        else: '$$REMOVE'
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    else: '$$REMOVE'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $project: {
+                            twizz_user: 0,
+                            parent_twizz: 0,
+                            parent_user: 0,
+                            grandparent_twizz: 0,
+                            grandparent_user: 0
+                        }
+                    }
+                ])
+                .toArray(),
+            databaseService.reports.countDocuments(filter)
+        ])
+
+        return {
+            reports,
+            pagination: {
+                page,
+                limit,
+                total,
+                total_pages: Math.ceil(total / limit)
+            }
+        }
+    }
+
     async handleReport({
         report_id,
         action,
@@ -260,6 +539,13 @@ class ReportsService {
 
     async deleteReport(report_id: string) {
         await databaseService.reports.deleteOne({ _id: new ObjectId(report_id) })
+        return true
+    }
+
+    async deleteProcessedReports() {
+        await databaseService.reports.deleteMany({
+            status: { $in: [ReportStatus.Resolved, ReportStatus.Ignored] }
+        })
         return true
     }
 }

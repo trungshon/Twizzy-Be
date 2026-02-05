@@ -71,3 +71,44 @@ export const deleteReportController = async (req: Request, res: Response, next: 
         next(error)
     }
 }
+export const deleteProcessedReportsController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const result = await reportsService.deleteProcessedReports()
+        return res.json({
+            message: 'Delete processed reports successfully',
+            result
+        })
+    } catch (error) {
+        next(error)
+    }
+}
+
+export const getMyReportsController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { user_id } = req.decoded_authorization as TokenPayload
+        const page = parseInt(req.query.page as string) || 1
+        const limit = parseInt(req.query.limit as string) || 10
+        const result = await reportsService.getMyReports({ user_id, page, limit })
+        return res.json({
+            message: 'Get my reports successfully',
+            result
+        })
+    } catch (error) {
+        next(error)
+    }
+}
+
+export const getReportsAgainstMeController = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { user_id } = req.decoded_authorization as TokenPayload
+        const page = parseInt(req.query.page as string) || 1
+        const limit = parseInt(req.query.limit as string) || 10
+        const result = await reportsService.getReportsAgainstMe({ user_id, page, limit })
+        return res.json({
+            message: 'Get reports against me successfully',
+            result
+        })
+    } catch (error) {
+        next(error)
+    }
+}
