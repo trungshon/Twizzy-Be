@@ -39,6 +39,15 @@ const initSocket = (httpServer: ServerHttp) => {
         const { user_id, verify } = socket.handshake.auth.decoded_authorization as TokenPayload
         console.log(`user ${user_id} connected (socket: ${socket.id})`)
 
+        // Check for concurrent login
+        const existingSocketId = users[user_id]?.socket_id
+        if (existingSocketId && existingSocketId !== socket.id) {
+            console.log(`Concurrent login detected for user ${user_id}. Notifying old socket ${existingSocketId}`)
+            io.to(existingSocketId).emit('concurrent_login', {
+                message: 'Tài khoản đang được đăng nhập ở thiết bị khác, vui lòng đăng xuất'
+            })
+        }
+
         users[user_id] = { socket_id: socket.id }
         console.log(users)
         socket.use(async (packet, next) => {
@@ -127,7 +136,9 @@ const initSocket = (httpServer: ServerHttp) => {
             socket.emit('receive_message', messagePayload)
         })
         socket.on('disconnect', () => {
-            delete users[user_id]
+            if (users[user_id]?.socket_id === socket.id) {
+                delete users[user_id]
+            }
             console.log(`user ${user_id} disconnected`)
         })
     })
