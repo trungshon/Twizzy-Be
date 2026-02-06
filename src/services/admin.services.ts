@@ -268,6 +268,45 @@ class AdminService {
         })
         pipeline.push({ $unwind: { path: '$user', preserveNullAndEmptyArrays: true } })
 
+        // Lookup parent_twizz
+        pipeline.push({
+            $lookup: {
+                from: process.env.DB_TWIZZS_COLLECTION,
+                localField: 'parent_id',
+                foreignField: '_id',
+                as: 'parent_twizz'
+            }
+        })
+        pipeline.push({ $unwind: { path: '$parent_twizz', preserveNullAndEmptyArrays: true } })
+
+        // Lookup parent_twizz user
+        pipeline.push({
+            $lookup: {
+                from: process.env.DB_USERS_COLLECTION,
+                localField: 'parent_twizz.user_id',
+                foreignField: '_id',
+                as: 'parent_twizz_user',
+                pipeline: [
+                    {
+                        $project: {
+                            _id: 1,
+                            name: 1,
+                            username: 1,
+                            avatar: 1
+                        }
+                    }
+                ]
+            }
+        })
+        pipeline.push({ $unwind: { path: '$parent_twizz_user', preserveNullAndEmptyArrays: true } })
+
+        // Add user to parent_twizz
+        pipeline.push({
+            $addFields: {
+                'parent_twizz.user': '$parent_twizz_user'
+            }
+        })
+
         // Count total
         const countPipeline = [...pipeline, { $count: 'total' }]
         const countResult = await databaseService.twizzs.aggregate(countPipeline).toArray()
