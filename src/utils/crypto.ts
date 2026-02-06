@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt'
 
-const SALT_ROUNDS = 10 // Có thể tăng lên 12 hoặc 14 cho bảo mật cao hơn
+const SALT_ROUNDS = 10
 
 async function hashPassword(password: string) {
   return await bcrypt.hash(password, SALT_ROUNDS)

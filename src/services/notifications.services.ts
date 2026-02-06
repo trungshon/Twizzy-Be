@@ -383,6 +383,157 @@ class NotificationsService {
                 }
             },
             {
+                $addFields: {
+                    'report_id_obj': {
+                        $cond: {
+                            if: { $and: [{ $ne: ['$metadata.report_id', null] }, { $ne: ['$metadata.report_id', ''] }] },
+                            then: { $toObjectId: '$metadata.report_id' },
+                            else: '$$REMOVE'
+                        }
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'reports',
+                    localField: 'report_id_obj',
+                    foreignField: '_id',
+                    as: 'report'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$report',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'twizzs',
+                    localField: 'report.twizz_id',
+                    foreignField: '_id',
+                    as: 'report.twizz'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$report.twizz',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $addFields: {
+                    'report.twizz': { $ifNull: ['$report.twizz', '$report.twizz_snapshot'] }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'report.twizz.user_id',
+                    foreignField: '_id',
+                    as: 'report.twizz.user'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$report.twizz.user',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'report.user_id',
+                    foreignField: '_id',
+                    as: 'report.reporter'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$report.reporter',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            // Populate parent_twizz for report.twizz (2 levels)
+            {
+                $lookup: {
+                    from: 'twizzs',
+                    localField: 'report.twizz.parent_id',
+                    foreignField: '_id',
+                    as: 'report.twizz.parent_twizz',
+                    pipeline: [
+                        {
+                            $lookup: {
+                                from: 'users',
+                                localField: 'user_id',
+                                foreignField: '_id',
+                                as: 'user'
+                            }
+                        },
+                        {
+                            $unwind: {
+                                path: '$user',
+                                preserveNullAndEmptyArrays: true
+                            }
+                        },
+                        // Level 2: Grandparent
+                        {
+                            $lookup: {
+                                from: 'twizzs',
+                                localField: 'parent_id',
+                                foreignField: '_id',
+                                as: 'parent_twizz',
+                                pipeline: [
+                                    {
+                                        $lookup: {
+                                            from: 'users',
+                                            localField: 'user_id',
+                                            foreignField: '_id',
+                                            as: 'user'
+                                        }
+                                    },
+                                    {
+                                        $unwind: {
+                                            path: '$user',
+                                            preserveNullAndEmptyArrays: true
+                                        }
+                                    },
+                                    {
+                                        $project: {
+                                            user: {
+                                                password: 0,
+                                                email: 0,
+                                                date_of_birth: 0
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            $addFields: {
+                                parent_twizz: { $arrayElemAt: ['$parent_twizz', 0] }
+                            }
+                        },
+                        {
+                            $project: {
+                                user: {
+                                    password: 0,
+                                    email_verify_token: 0,
+                                    email: 0,
+                                    date_of_birth: 0
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    'report.twizz.parent_twizz': { $arrayElemAt: ['$report.twizz.parent_twizz', 0] }
+                }
+            },
+            {
                 $project: {
                     'twizz.twizz_children': 0,
                     'twizz.user_likes': 0,
@@ -394,7 +545,11 @@ class NotificationsService {
                     'twizz.user.forgot_password_token': 0,
                     'twizz.user.forgot_password_otp': 0,
                     'twizz.user.forgot_password_otp_expires_at:': 0,
-                    'twizz.user.date_of_birth': 0
+                    'twizz.user.date_of_birth': 0,
+                    'report_id_obj': 0,
+                    'report.twizz_snapshot': 0,
+                    'report.twizz.user.password': 0,
+                    'report.reporter.password': 0
                 }
             }
         )

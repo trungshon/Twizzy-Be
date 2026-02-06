@@ -22,9 +22,36 @@ class ReportsService {
         let twizz_snapshot = null
         if (twizz) {
             const user = await databaseService.users.findOne({ _id: twizz.user_id })
+            let parent_twizz = null
+            if (twizz.parent_id) {
+                const parent = await databaseService.twizzs.findOne({ _id: twizz.parent_id })
+                if (parent) {
+                    const parent_user = await databaseService.users.findOne({ _id: parent.user_id })
+
+                    // Grandparent level
+                    let grandparent_twizz = null
+                    if (parent.parent_id) {
+                        const grandparent = await databaseService.twizzs.findOne({ _id: parent.parent_id })
+                        if (grandparent) {
+                            const grandparent_user = await databaseService.users.findOne({ _id: grandparent.user_id })
+                            grandparent_twizz = {
+                                ...grandparent,
+                                user: grandparent_user
+                            }
+                        }
+                    }
+
+                    parent_twizz = {
+                        ...parent,
+                        user: parent_user,
+                        parent_twizz: grandparent_twizz
+                    }
+                }
+            }
             twizz_snapshot = {
                 ...twizz,
-                user
+                user,
+                parent_twizz
             }
         }
 
@@ -412,6 +439,18 @@ class ReportsService {
         if (!report) throw new Error('Report not found')
 
         if (action === 'delete') {
+            await databaseService.reports.updateOne(
+                { _id: new ObjectId(report_id) },
+                {
+                    $set: {
+                        status: ReportStatus.Resolved,
+                        action: 'delete',
+                        admin_id: new ObjectId(admin_id),
+                        updated_at: new Date()
+                    }
+                }
+            )
+
             await adminService.deleteTwizz(report.twizz_id.toString())
 
             // Increment violation count
@@ -433,7 +472,8 @@ class ReportsService {
                     sender_id: admin_id,
                     type: NotificationType.PostDeleted,
                     metadata: {
-                        violation_count: updatedUser?.violation_count || 0
+                        violation_count: updatedUser?.violation_count || 0,
+                        report_id: report._id.toString()
                     }
                 })
 
@@ -448,7 +488,10 @@ class ReportsService {
                     await notificationsService.createNotification({
                         user_id: twizz_user_id.toString(),
                         sender_id: admin_id,
-                        type: NotificationType.AccountBanned
+                        type: NotificationType.AccountBanned,
+                        metadata: {
+                            report_id: report._id.toString()
+                        }
                     })
                 }
             }
@@ -457,21 +500,24 @@ class ReportsService {
             await notificationsService.createNotification({
                 user_id: report.user_id.toString(),
                 sender_id: admin_id,
-                type: NotificationType.ReportResolved
+                type: NotificationType.ReportResolved,
+                metadata: {
+                    report_id: report._id.toString()
+                }
             })
-
+        } else if (action === 'ban') {
             await databaseService.reports.updateOne(
                 { _id: new ObjectId(report_id) },
                 {
                     $set: {
                         status: ReportStatus.Resolved,
-                        action: 'delete',
+                        action: 'ban',
                         admin_id: new ObjectId(admin_id),
                         updated_at: new Date()
                     }
                 }
             )
-        } else if (action === 'ban') {
+
             const twizz_user_id = (report as any).twizz_snapshot?.user_id || (await databaseService.twizzs.findOne({ _id: report.twizz_id }))?.user_id
 
             if (twizz_user_id) {
@@ -489,39 +535,28 @@ class ReportsService {
                     }
                 )
 
+
                 // Send notifications
                 await Promise.all([
                     notificationsService.createNotification({
                         user_id: twizz_user_id.toString(),
                         sender_id: admin_id,
-                        type: NotificationType.AccountBanned
+                        type: NotificationType.AccountBanned,
+                        metadata: {
+                            report_id: report._id.toString()
+                        }
                     }),
                     notificationsService.createNotification({
                         user_id: report.user_id.toString(),
                         sender_id: admin_id,
-                        type: NotificationType.ReportResolved
+                        type: NotificationType.ReportResolved,
+                        metadata: {
+                            report_id: report._id.toString()
+                        }
                     })
                 ])
             }
-            await databaseService.reports.updateOne(
-                { _id: new ObjectId(report_id) },
-                {
-                    $set: {
-                        status: ReportStatus.Resolved,
-                        action: 'ban',
-                        admin_id: new ObjectId(admin_id),
-                        updated_at: new Date()
-                    }
-                }
-            )
         } else if (action === 'ignore') {
-            // Send notification to reporter
-            await notificationsService.createNotification({
-                user_id: report.user_id.toString(),
-                sender_id: admin_id,
-                type: NotificationType.ReportIgnored
-            })
-
             await databaseService.reports.updateOne(
                 { _id: new ObjectId(report_id) },
                 {
@@ -533,6 +568,16 @@ class ReportsService {
                     }
                 }
             )
+
+            // Send notification to reporter
+            await notificationsService.createNotification({
+                user_id: report.user_id.toString(),
+                sender_id: admin_id,
+                type: NotificationType.ReportIgnored,
+                metadata: {
+                    report_id: report._id.toString()
+                }
+            })
         }
         return true
     }

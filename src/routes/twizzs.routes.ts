@@ -53,7 +53,7 @@ twizzsRouter.get(
   '/:twizz_id',
   twizzIdValidator,
   isUserLoggedInValidator(accessTokenValidator),
-  isUserLoggedInValidator(verifiedUserValidator),
+  // isUserLoggedInValidator(verifiedUserValidator),
   audienceValidator,
   wrapRequestHandler(getTwizzController)
 )
@@ -77,7 +77,7 @@ twizzsRouter.get(
   paginationValidator,
   getTwizzChildrenValidator,
   isUserLoggedInValidator(accessTokenValidator),
-  isUserLoggedInValidator(verifiedUserValidator),
+  // isUserLoggedInValidator(verifiedUserValidator),
   audienceValidator,
   wrapRequestHandler(getTwizzChildrenController)
 )
