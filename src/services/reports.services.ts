@@ -494,6 +494,12 @@ class ReportsService {
                             report_id: report._id.toString()
                         }
                     })
+
+                    // Emit socket event for status change
+                    const targetSocketId = users[twizz_user_id.toString()]?.socket_id
+                    if (targetSocketId) {
+                        io.to(targetSocketId).emit('user_status_changed', { verify: UserVerifyStatus.Banned })
+                    }
                 }
             }
 
