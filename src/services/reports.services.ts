@@ -131,7 +131,78 @@ class ReportsService {
                             as: 'reporter'
                         }
                     },
-                    { $unwind: { path: '$reporter', preserveNullAndEmptyArrays: true } }
+                    { $unwind: { path: '$reporter', preserveNullAndEmptyArrays: true } },
+                    // Lookup parent_twizz for nested twizz
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'twizz.parent_id',
+                            foreignField: '_id',
+                            as: 'parent_twizz'
+                        }
+                    },
+                    { $unwind: { path: '$parent_twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'parent_twizz.user_id',
+                            foreignField: '_id',
+                            as: 'parent_user'
+                        }
+                    },
+                    { $unwind: { path: '$parent_user', preserveNullAndEmptyArrays: true } },
+                    // Lookup grandparent_twizz (parent of parent) for nested quotes
+                    {
+                        $lookup: {
+                            from: 'twizzs',
+                            localField: 'parent_twizz.parent_id',
+                            foreignField: '_id',
+                            as: 'grandparent_twizz'
+                        }
+                    },
+                    { $unwind: { path: '$grandparent_twizz', preserveNullAndEmptyArrays: true } },
+                    {
+                        $lookup: {
+                            from: 'users',
+                            localField: 'grandparent_twizz.user_id',
+                            foreignField: '_id',
+                            as: 'grandparent_user'
+                        }
+                    },
+                    { $unwind: { path: '$grandparent_user', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            'twizz.parent_twizz': {
+                                $cond: {
+                                    if: { $ne: ['$parent_twizz', null] },
+                                    then: {
+                                        $mergeObjects: [
+                                            '$parent_twizz',
+                                            { user: '$parent_user' },
+                                            {
+                                                parent_twizz: {
+                                                    $cond: {
+                                                        if: { $ne: ['$grandparent_twizz', null] },
+                                                        then: { $mergeObjects: ['$grandparent_twizz', { user: '$grandparent_user' }] },
+                                                        else: '$$REMOVE'
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    else: '$$REMOVE'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $project: {
+                            parent_twizz: 0,
+                            parent_user: 0,
+                            grandparent_twizz: 0,
+                            grandparent_user: 0
+                        }
+                    }
                 ])
                 .toArray(),
             databaseService.reports.countDocuments(filter)
