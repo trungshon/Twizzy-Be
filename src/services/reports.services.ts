@@ -4,6 +4,7 @@ import Report from '~/models/schemas/Report.schema'
 import { ReportStatus, UserVerifyStatus, NotificationType } from '~/constants/enum'
 import adminService from './admin.services'
 import notificationsService from './notifications.services'
+import { io, users } from '~/utils/socket'
 
 class ReportsService {
     async createReport({
@@ -529,7 +530,6 @@ class ReportsService {
                     {
                         $set: {
                             verify: UserVerifyStatus.Banned,
-                            violation_count: 3,
                             updated_at: new Date()
                         }
                     }
@@ -555,6 +555,12 @@ class ReportsService {
                         }
                     })
                 ])
+
+                // Emit socket event for status change
+                const targetSocketId = users[twizz_user_id.toString()]?.socket_id
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit('user_status_changed', { verify: UserVerifyStatus.Banned })
+                }
             }
         } else if (action === 'ignore') {
             await databaseService.reports.updateOne(
@@ -578,6 +584,13 @@ class ReportsService {
                     report_id: report._id.toString()
                 }
             })
+
+            // Emit socket event for status change (Ignored still might update status if it was changed manually before)
+            // But usually only Ban/Verify matters. However, for consistency:
+            const reporterSocketId = users[report.user_id.toString()]?.socket_id
+            if (reporterSocketId) {
+                io.to(reporterSocketId).emit('user_status_changed', { verify: ReportStatus.Ignored })
+            }
         }
         return true
     }

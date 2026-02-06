@@ -27,13 +27,6 @@ const initSocket = (httpServer: ServerHttp) => {
         const accessToken = Authorization?.split(' ')[1]
         try {
             const decoded_authorization = await verifyAccessToken(accessToken)
-            const { verify } = decoded_authorization as TokenPayload
-            if (verify !== UserVerifyStatus.Verified) {
-                throw new ErrorWithStatus({
-                    message: USER_MESSAGES.USER_NOT_VERIFIED,
-                    status: HTTP_STATUS.FORBIDDEN
-                })
-            }
             socket.handshake.auth.decoded_authorization = decoded_authorization
             socket.handshake.auth.access_token = accessToken
             next()
@@ -43,7 +36,7 @@ const initSocket = (httpServer: ServerHttp) => {
     })
 
     io.on('connection', (socket) => {
-        const { user_id } = socket.handshake.auth.decoded_authorization as TokenPayload
+        const { user_id, verify } = socket.handshake.auth.decoded_authorization as TokenPayload
         console.log(`user ${user_id} connected (socket: ${socket.id})`)
 
         users[user_id] = { socket_id: socket.id }
@@ -64,6 +57,14 @@ const initSocket = (httpServer: ServerHttp) => {
             }
         })
         socket.on('send_message', async (data) => {
+            // Check if user is verified before allowing to send message
+            if (verify !== UserVerifyStatus.Verified) {
+                return socket.emit('error', {
+                    message: USER_MESSAGES.USER_NOT_VERIFIED,
+                    status: HTTP_STATUS.FORBIDDEN
+                })
+            }
+
             const { receiver_id, sender_id, content } = data.payload
             const receiver_socket_id = users[receiver_id]?.socket_id
 

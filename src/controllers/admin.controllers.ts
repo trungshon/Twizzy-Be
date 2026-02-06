@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import { ParamsDictionary } from 'express-serve-static-core'
+import { io, users } from '~/utils/socket'
 import adminService from '~/services/admin.services'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { UserVerifyStatus } from '~/constants/enum'
@@ -90,6 +91,12 @@ export const updateUserStatusController = async (
             return res.status(HTTP_STATUS.NOT_FOUND).json({
                 message: 'User not found or update failed'
             })
+        }
+
+        // Emit socket event to the target user if they are online
+        const targetSocketId = users[user_id]?.socket_id
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('user_status_changed', { verify })
         }
 
         return res.json({

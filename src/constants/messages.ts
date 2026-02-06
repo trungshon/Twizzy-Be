@@ -50,6 +50,7 @@ export const USER_MESSAGES = {
   UPDATE_ME_SUCCESSFULLY: 'Cập nhật thông tin cá nhân thành công',
   GET_PROFILE_SUCCESSFULLY: 'Lấy thông tin người dùng thành công',
   USER_NOT_VERIFIED: 'Người dùng chưa được xác nhận',
+  USER_IS_BANNED: 'Người dùng đã bị cấm',
   BIO_MUST_BE_A_STRING: 'Bio phải là một chuỗi',
   BIO_MUST_BE_FROM_1_TO_200_CHARACTERS: 'Bio phải có từ 1 đến 200 ký tự',
   LOCATION_MUST_BE_A_STRING: 'Địa chỉ phải là một chuỗi',
