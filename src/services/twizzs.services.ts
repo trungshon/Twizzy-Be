@@ -191,6 +191,50 @@ class TwizzsService {
                       }
                     },
                     {
+                      $lookup: {
+                        from: 'twizzs',
+                        localField: 'parent_id',
+                        foreignField: '_id',
+                        pipeline: [
+                          {
+                            $lookup: {
+                              from: 'users',
+                              localField: 'user_id',
+                              foreignField: '_id',
+                              as: 'user'
+                            }
+                          },
+                          {
+                            $unwind: {
+                              path: '$user',
+                              preserveNullAndEmptyArrays: true
+                            }
+                          },
+                          {
+                            $project: {
+                              user: {
+                                password: 0,
+                                email_verify_token: 0,
+                                email_verify_otp: 0,
+                                email_verify_otp_expires_at: 0,
+                                forgot_password_otp: 0,
+                                forgot_password_otp_expires_at: 0,
+                                forgot_password_token: 0,
+                                date_of_birth: 0
+                              }
+                            }
+                          }
+                        ],
+                        as: 'parent_twizz'
+                      }
+                    },
+                    {
+                      $unwind: {
+                        path: '$parent_twizz',
+                        preserveNullAndEmptyArrays: true
+                      }
+                    },
+                    {
                       $project: {
                         user: {
                           password: 0,
@@ -338,6 +382,308 @@ class TwizzsService {
       { returnDocument: 'after', projection: { user_views: 1, guest_views: 1, updated_at: 1 } }
     )
     return result as WithId<{ user_views: number; guest_views: number; updated_at: Date }>
+  }
+
+  async getTwizz(twizz_id: string, user_id?: string) {
+    const user_id_objectId = user_id ? new ObjectId(user_id) : null
+    const twizzs = await databaseService.twizzs
+      .aggregate([
+        {
+          $match: {
+            _id: new ObjectId(twizz_id)
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: 'user'
+          }
+        },
+        {
+          $unwind: {
+            path: '$user'
+          }
+        },
+        {
+          $lookup: {
+            from: 'hashtags',
+            localField: 'hashtags',
+            foreignField: '_id',
+            as: 'hashtags'
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'mentions',
+            foreignField: '_id',
+            as: 'mentions'
+          }
+        },
+        {
+          $addFields: {
+            mentions: {
+              $map: {
+                input: '$mentions',
+                as: 'mention',
+                in: {
+                  _id: '$$mention._id',
+                  name: '$$mention.name',
+                  username: '$$mention.username',
+                  email: '$$mention.email'
+                }
+              }
+            }
+          }
+        },
+        {
+          $lookup: {
+            from: 'bookmarks',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'bookmarks'
+          }
+        },
+        {
+          $lookup: {
+            from: 'likes',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'likes'
+          }
+        },
+        {
+          $lookup: {
+            from: 'likes',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'user_likes',
+            pipeline: [
+              {
+                $match: {
+                  user_id: user_id_objectId
+                }
+              }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'bookmarks',
+            localField: '_id',
+            foreignField: 'twizz_id',
+            as: 'user_bookmarks',
+            pipeline: [
+              {
+                $match: {
+                  user_id: user_id_objectId
+                }
+              }
+            ]
+          }
+        },
+        {
+          $lookup: {
+            from: 'twizzs',
+            localField: '_id',
+            foreignField: 'parent_id',
+            as: 'twizz_children'
+          }
+        },
+        // Lookup parent twizz for quote/comment
+        {
+          $lookup: {
+            from: 'twizzs',
+            localField: 'parent_id',
+            foreignField: '_id',
+            pipeline: [
+              {
+                $lookup: {
+                  from: 'users',
+                  localField: 'user_id',
+                  foreignField: '_id',
+                  as: 'user'
+                }
+              },
+              {
+                $unwind: {
+                  path: '$user',
+                  preserveNullAndEmptyArrays: true
+                }
+              },
+              {
+                $lookup: {
+                  from: 'twizzs',
+                  localField: 'parent_id',
+                  foreignField: '_id',
+                  pipeline: [
+                    {
+                      $lookup: {
+                        from: 'users',
+                        localField: 'user_id',
+                        foreignField: '_id',
+                        as: 'user'
+                      }
+                    },
+                    {
+                      $unwind: {
+                        path: '$user',
+                        preserveNullAndEmptyArrays: true
+                      }
+                    },
+                    {
+                      $lookup: {
+                        from: 'twizzs',
+                        localField: 'parent_id',
+                        foreignField: '_id',
+                        pipeline: [
+                          {
+                            $lookup: {
+                              from: 'users',
+                              localField: 'user_id',
+                              foreignField: '_id',
+                              as: 'user'
+                            }
+                          },
+                          {
+                            $unwind: {
+                              path: '$user',
+                              preserveNullAndEmptyArrays: true
+                            }
+                          },
+                          {
+                            $project: {
+                              user: {
+                                password: 0,
+                                email_verify_token: 0,
+                                email_verify_otp: 0,
+                                email_verify_otp_expires_at: 0,
+                                forgot_password_otp: 0,
+                                forgot_password_otp_expires_at: 0,
+                                forgot_password_token: 0,
+                                date_of_birth: 0
+                              }
+                            }
+                          }
+                        ],
+                        as: 'parent_twizz'
+                      }
+                    },
+                    {
+                      $unwind: {
+                        path: '$parent_twizz',
+                        preserveNullAndEmptyArrays: true
+                      }
+                    },
+                    {
+                      $project: {
+                        user: {
+                          password: 0,
+                          email_verify_token: 0,
+                          email_verify_otp: 0,
+                          email_verify_otp_expires_at: 0,
+                          forgot_password_token: 0,
+                          forgot_password_otp: 0,
+                          forgot_password_otp_expires_at: 0,
+                          date_of_birth: 0
+                        }
+                      }
+                    }
+                  ],
+                  as: 'parent_twizz'
+                }
+              },
+              {
+                $unwind: {
+                  path: '$parent_twizz',
+                  preserveNullAndEmptyArrays: true
+                }
+              },
+              {
+                $project: {
+                  user: {
+                    password: 0,
+                    email_verify_token: 0,
+                    email_verify_otp: 0,
+                    email_verify_otp_expires_at: 0,
+                    forgot_password_token: 0,
+                    forgot_password_otp: 0,
+                    forgot_password_otp_expires_at: 0,
+                    date_of_birth: 0
+                  }
+                }
+              }
+            ],
+            as: 'parent_twizz'
+          }
+        },
+        {
+          $unwind: {
+            path: '$parent_twizz',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          $addFields: {
+            bookmarks: {
+              $size: '$bookmarks'
+            },
+            likes: {
+              $size: '$likes'
+            },
+            is_liked: {
+              $gt: [{ $size: '$user_likes' }, 0]
+            },
+            is_bookmarked: {
+              $gt: [{ $size: '$user_bookmarks' }, 0]
+            },
+
+            comment_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.Comment]
+                  }
+                }
+              }
+            },
+            quote_count: {
+              $size: {
+                $filter: {
+                  input: '$twizz_children',
+                  as: 'item',
+                  cond: {
+                    $eq: ['$$item.type', TwizzType.QuoteTwizz]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            twizz_children: 0,
+            user_likes: 0,
+            user_bookmarks: 0,
+            user: {
+              password: 0,
+              email_verify_token: 0,
+              email_verify_otp: 0,
+              email_verify_otp_expires_at: 0,
+              forgot_password_token: 0,
+              forgot_password_otp: 0,
+              forgot_password_otp_expires_at: 0,
+              date_of_birth: 0
+            }
+          }
+        }
+      ])
+      .toArray()
+    return twizzs[0]
   }
 
   async getTwizzChildren({

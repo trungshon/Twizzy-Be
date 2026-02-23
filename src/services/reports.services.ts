@@ -35,9 +35,24 @@ class ReportsService {
                         const grandparent = await databaseService.twizzs.findOne({ _id: parent.parent_id })
                         if (grandparent) {
                             const grandparent_user = await databaseService.users.findOne({ _id: grandparent.user_id })
+
+                            // Great-grandparent level
+                            let great_grandparent_twizz = null
+                            if (grandparent.parent_id) {
+                                const great_grandparent = await databaseService.twizzs.findOne({ _id: grandparent.parent_id })
+                                if (great_grandparent) {
+                                    const great_grandparent_user = await databaseService.users.findOne({ _id: great_grandparent.user_id })
+                                    great_grandparent_twizz = {
+                                        ...great_grandparent,
+                                        user: great_grandparent_user
+                                    }
+                                }
+                            }
+
                             grandparent_twizz = {
                                 ...grandparent,
-                                user: grandparent_user
+                                user: grandparent_user,
+                                parent_twizz: great_grandparent_twizz
                             }
                         }
                     }
@@ -157,44 +172,71 @@ class ReportsService {
                             from: 'twizzs',
                             localField: 'parent_twizz.parent_id',
                             foreignField: '_id',
+                            pipeline: [
+                                {
+                                    $lookup: {
+                                        from: 'users',
+                                        localField: 'user_id',
+                                        foreignField: '_id',
+                                        as: 'user'
+                                    }
+                                },
+                                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                                {
+                                    $lookup: {
+                                        from: 'twizzs',
+                                        localField: 'parent_id',
+                                        foreignField: '_id',
+                                        pipeline: [
+                                            {
+                                                $lookup: {
+                                                    from: 'users',
+                                                    localField: 'user_id',
+                                                    foreignField: '_id',
+                                                    as: 'user'
+                                                }
+                                            },
+                                            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                                            {
+                                                $project: {
+                                                    user: {
+                                                        password: 0,
+                                                        email_verify_token: 0,
+                                                        twizz_circle: 0,
+                                                        email_verify_otp: 0,
+                                                        email_verify_otp_expires_at: 0,
+                                                        forgot_password_token: 0,
+                                                        forgot_password_otp: 0,
+                                                        forgot_password_otp_expires_at: 0,
+                                                        date_of_birth: 0
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        as: 'parent_twizz'
+                                    }
+                                },
+                                { $unwind: { path: '$parent_twizz', preserveNullAndEmptyArrays: true } },
+                                {
+                                    $project: {
+                                        user: {
+                                            password: 0,
+                                            email_verify_token: 0,
+                                            twizz_circle: 0,
+                                            email_verify_otp: 0,
+                                            email_verify_otp_expires_at: 0,
+                                            forgot_password_token: 0,
+                                            forgot_password_otp: 0,
+                                            forgot_password_otp_expires_at: 0,
+                                            date_of_birth: 0
+                                        }
+                                    }
+                                }
+                            ],
                             as: 'grandparent_twizz'
                         }
                     },
                     { $unwind: { path: '$grandparent_twizz', preserveNullAndEmptyArrays: true } },
-                    {
-                        $lookup: {
-                            from: 'users',
-                            localField: 'grandparent_twizz.user_id',
-                            foreignField: '_id',
-                            as: 'grandparent_user'
-                        }
-                    },
-                    { $unwind: { path: '$grandparent_user', preserveNullAndEmptyArrays: true } },
-                    {
-                        $addFields: {
-                            'twizz.parent_twizz': {
-                                $cond: {
-                                    if: { $ne: ['$parent_twizz', null] },
-                                    then: {
-                                        $mergeObjects: [
-                                            '$parent_twizz',
-                                            { user: '$parent_user' },
-                                            {
-                                                parent_twizz: {
-                                                    $cond: {
-                                                        if: { $ne: ['$grandparent_twizz', null] },
-                                                        then: { $mergeObjects: ['$grandparent_twizz', { user: '$grandparent_user' }] },
-                                                        else: '$$REMOVE'
-                                                    }
-                                                }
-                                            }
-                                        ]
-                                    },
-                                    else: '$$REMOVE'
-                                }
-                            }
-                        }
-                    },
                     {
                         $project: {
                             parent_twizz: 0,
@@ -290,44 +332,71 @@ class ReportsService {
                             from: 'twizzs',
                             localField: 'parent_twizz.parent_id',
                             foreignField: '_id',
+                            pipeline: [
+                                {
+                                    $lookup: {
+                                        from: 'users',
+                                        localField: 'user_id',
+                                        foreignField: '_id',
+                                        as: 'user'
+                                    }
+                                },
+                                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                                {
+                                    $lookup: {
+                                        from: 'twizzs',
+                                        localField: 'parent_id',
+                                        foreignField: '_id',
+                                        pipeline: [
+                                            {
+                                                $lookup: {
+                                                    from: 'users',
+                                                    localField: 'user_id',
+                                                    foreignField: '_id',
+                                                    as: 'user'
+                                                }
+                                            },
+                                            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                                            {
+                                                $project: {
+                                                    user: {
+                                                        password: 0,
+                                                        email_verify_token: 0,
+                                                        twizz_circle: 0,
+                                                        email_verify_otp: 0,
+                                                        email_verify_otp_expires_at: 0,
+                                                        forgot_password_token: 0,
+                                                        forgot_password_otp: 0,
+                                                        forgot_password_otp_expires_at: 0,
+                                                        date_of_birth: 0
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        as: 'parent_twizz'
+                                    }
+                                },
+                                { $unwind: { path: '$parent_twizz', preserveNullAndEmptyArrays: true } },
+                                {
+                                    $project: {
+                                        user: {
+                                            password: 0,
+                                            email_verify_token: 0,
+                                            twizz_circle: 0,
+                                            email_verify_otp: 0,
+                                            email_verify_otp_expires_at: 0,
+                                            forgot_password_token: 0,
+                                            forgot_password_otp: 0,
+                                            forgot_password_otp_expires_at: 0,
+                                            date_of_birth: 0
+                                        }
+                                    }
+                                }
+                            ],
                             as: 'grandparent_twizz'
                         }
                     },
                     { $unwind: { path: '$grandparent_twizz', preserveNullAndEmptyArrays: true } },
-                    {
-                        $lookup: {
-                            from: 'users',
-                            localField: 'grandparent_twizz.user_id',
-                            foreignField: '_id',
-                            as: 'grandparent_user'
-                        }
-                    },
-                    { $unwind: { path: '$grandparent_user', preserveNullAndEmptyArrays: true } },
-                    {
-                        $addFields: {
-                            'twizz.parent_twizz': {
-                                $cond: {
-                                    if: { $ne: ['$parent_twizz', null] },
-                                    then: {
-                                        $mergeObjects: [
-                                            '$parent_twizz',
-                                            { user: '$parent_user' },
-                                            {
-                                                parent_twizz: {
-                                                    $cond: {
-                                                        if: { $ne: ['$grandparent_twizz', null] },
-                                                        then: { $mergeObjects: ['$grandparent_twizz', { user: '$grandparent_user' }] },
-                                                        else: '$$REMOVE'
-                                                    }
-                                                }
-                                            }
-                                        ]
-                                    },
-                                    else: '$$REMOVE'
-                                }
-                            }
-                        }
-                    },
                     {
                         $project: {
                             twizz_user: 0,
@@ -435,44 +504,71 @@ class ReportsService {
                             from: 'twizzs',
                             localField: 'parent_twizz.parent_id',
                             foreignField: '_id',
+                            pipeline: [
+                                {
+                                    $lookup: {
+                                        from: 'users',
+                                        localField: 'user_id',
+                                        foreignField: '_id',
+                                        as: 'user'
+                                    }
+                                },
+                                { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                                {
+                                    $lookup: {
+                                        from: 'twizzs',
+                                        localField: 'parent_id',
+                                        foreignField: '_id',
+                                        pipeline: [
+                                            {
+                                                $lookup: {
+                                                    from: 'users',
+                                                    localField: 'user_id',
+                                                    foreignField: '_id',
+                                                    as: 'user'
+                                                }
+                                            },
+                                            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+                                            {
+                                                $project: {
+                                                    user: {
+                                                        password: 0,
+                                                        email_verify_token: 0,
+                                                        twizz_circle: 0,
+                                                        email_verify_otp: 0,
+                                                        email_verify_otp_expires_at: 0,
+                                                        forgot_password_token: 0,
+                                                        forgot_password_otp: 0,
+                                                        forgot_password_otp_expires_at: 0,
+                                                        date_of_birth: 0
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        as: 'parent_twizz'
+                                    }
+                                },
+                                { $unwind: { path: '$parent_twizz', preserveNullAndEmptyArrays: true } },
+                                {
+                                    $project: {
+                                        user: {
+                                            password: 0,
+                                            email_verify_token: 0,
+                                            twizz_circle: 0,
+                                            email_verify_otp: 0,
+                                            email_verify_otp_expires_at: 0,
+                                            forgot_password_token: 0,
+                                            forgot_password_otp: 0,
+                                            forgot_password_otp_expires_at: 0,
+                                            date_of_birth: 0
+                                        }
+                                    }
+                                }
+                            ],
                             as: 'grandparent_twizz'
                         }
                     },
                     { $unwind: { path: '$grandparent_twizz', preserveNullAndEmptyArrays: true } },
-                    {
-                        $lookup: {
-                            from: 'users',
-                            localField: 'grandparent_twizz.user_id',
-                            foreignField: '_id',
-                            as: 'grandparent_user'
-                        }
-                    },
-                    { $unwind: { path: '$grandparent_user', preserveNullAndEmptyArrays: true } },
-                    {
-                        $addFields: {
-                            'twizz.parent_twizz': {
-                                $cond: {
-                                    if: { $ne: ['$parent_twizz', null] },
-                                    then: {
-                                        $mergeObjects: [
-                                            '$parent_twizz',
-                                            { user: '$parent_user' },
-                                            {
-                                                parent_twizz: {
-                                                    $cond: {
-                                                        if: { $ne: ['$grandparent_twizz', null] },
-                                                        then: { $mergeObjects: ['$grandparent_twizz', { user: '$grandparent_user' }] },
-                                                        else: '$$REMOVE'
-                                                    }
-                                                }
-                                            }
-                                        ]
-                                    },
-                                    else: '$$REMOVE'
-                                }
-                            }
-                        }
-                    },
                     {
                         $project: {
                             twizz_user: 0,

@@ -223,6 +223,51 @@ class SearchService {
                         }
                       },
                       {
+                        $lookup: {
+                          from: 'twizzs',
+                          localField: 'parent_id',
+                          foreignField: '_id',
+                          pipeline: [
+                            {
+                              $lookup: {
+                                from: 'users',
+                                localField: 'user_id',
+                                foreignField: '_id',
+                                as: 'user'
+                              }
+                            },
+                            {
+                              $unwind: {
+                                path: '$user',
+                                preserveNullAndEmptyArrays: true
+                              }
+                            },
+                            {
+                              $project: {
+                                user: {
+                                  password: 0,
+                                  email_verify_token: 0,
+                                  twizz_circle: 0,
+                                  email_verify_otp: 0,
+                                  email_verify_otp_expires_at: 0,
+                                  forgot_password_otp: 0,
+                                  forgot_password_otp_expires_at: 0,
+                                  forgot_password_token: 0,
+                                  date_of_birth: 0
+                                }
+                              }
+                            }
+                          ],
+                          as: 'parent_twizz'
+                        }
+                      },
+                      {
+                        $unwind: {
+                          path: '$parent_twizz',
+                          preserveNullAndEmptyArrays: true
+                        }
+                      },
+                      {
                         $project: {
                           user: {
                             password: 0,

@@ -17,15 +17,16 @@ export const createTwizzController = async (req: Request<ParamsDictionary, any, 
 
 export const getTwizzController = async (req: Request, res: Response) => {
   const result = await twizzsService.increaseView(req.params.twizz_id, req.decoded_authorization?.user_id)
-  const twizz = {
-    ...req.twizz,
-    user_views: result.user_views,
-    guest_views: result.guest_views,
-    updated_at: result.updated_at
-  }
+  const twizz = await twizzsService.getTwizz(req.params.twizz_id, req.decoded_authorization?.user_id)
+
   return res.json({
     message: TWIZZ_MESSAGES.GET_TWIZZ_SUCCESSFULLY,
-    result: twizz
+    result: {
+      ...twizz,
+      user_views: result.user_views,
+      guest_views: result.guest_views,
+      updated_at: result.updated_at
+    }
   })
 }
 

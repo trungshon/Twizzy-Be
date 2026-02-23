@@ -193,39 +193,84 @@ class BookmarksService {
                     as: 'twizz_children'
                   }
                 },
-                ...(viewer_user_id_objectId
-                  ? [
+                {
+                  $lookup: {
+                    from: 'twizzs',
+                    localField: 'parent_id',
+                    foreignField: '_id',
+                    pipeline: [
                       {
                         $lookup: {
-                          from: 'likes',
-                          localField: '_id',
-                          foreignField: 'twizz_id',
-                          as: 'user_likes',
-                          pipeline: [
-                            {
-                              $match: {
-                                user_id: viewer_user_id_objectId
-                              }
-                            }
-                          ]
+                          from: 'users',
+                          localField: 'user_id',
+                          foreignField: '_id',
+                          as: 'user'
                         }
                       },
                       {
-                        $lookup: {
-                          from: 'bookmarks',
-                          localField: '_id',
-                          foreignField: 'twizz_id',
-                          as: 'user_bookmarks',
-                          pipeline: [
-                            {
-                              $match: {
-                                user_id: viewer_user_id_objectId
-                              }
-                            }
-                          ]
+                        $unwind: {
+                          path: '$user',
+                          preserveNullAndEmptyArrays: true
+                        }
+                      },
+                      {
+                        $project: {
+                          user: {
+                            password: 0,
+                            email_verify_token: 0,
+                            twizz_circle: 0,
+                            email_verify_otp: 0,
+                            email_verify_otp_expires_at: 0,
+                            forgot_password_otp: 0,
+                            forgot_password_otp_expires_at: 0,
+                            forgot_password_token: 0,
+                            date_of_birth: 0
+                          }
                         }
                       }
-                    ]
+                    ],
+                    as: 'parent_twizz'
+                  }
+                },
+                {
+                  $unwind: {
+                    path: '$parent_twizz',
+                    preserveNullAndEmptyArrays: true
+                  }
+                },
+                ...(viewer_user_id_objectId
+                  ? [
+                    {
+                      $lookup: {
+                        from: 'likes',
+                        localField: '_id',
+                        foreignField: 'twizz_id',
+                        as: 'user_likes',
+                        pipeline: [
+                          {
+                            $match: {
+                              user_id: viewer_user_id_objectId
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      $lookup: {
+                        from: 'bookmarks',
+                        localField: '_id',
+                        foreignField: 'twizz_id',
+                        as: 'user_bookmarks',
+                        pipeline: [
+                          {
+                            $match: {
+                              user_id: viewer_user_id_objectId
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
                   : []),
                 {
                   $addFields: {
@@ -287,12 +332,12 @@ class BookmarksService {
               as: 'user_likes',
               pipeline: viewer_user_id_objectId
                 ? [
-                    {
-                      $match: {
-                        user_id: viewer_user_id_objectId
-                      }
+                  {
+                    $match: {
+                      user_id: viewer_user_id_objectId
                     }
-                  ]
+                  }
+                ]
                 : []
             }
           },
@@ -304,12 +349,12 @@ class BookmarksService {
               as: 'user_bookmarks',
               pipeline: viewer_user_id_objectId
                 ? [
-                    {
-                      $match: {
-                        user_id: viewer_user_id_objectId
-                      }
+                  {
+                    $match: {
+                      user_id: viewer_user_id_objectId
                     }
-                  ]
+                  }
+                ]
                 : []
             }
           },
@@ -327,7 +372,7 @@ class BookmarksService {
               is_bookmarked: {
                 $gt: [{ $size: '$user_bookmarks' }, 0]
               },
-      
+
               comment_count: {
                 $size: {
                   $filter: {
@@ -431,31 +476,31 @@ class BookmarksService {
           },
           ...(viewer_user_id_objectId
             ? [
-                {
-                  $lookup: {
-                    from: 'followers',
-                    let: { user_id: '$_id' },
-                    pipeline: [
-                      {
-                        $match: {
-                          $expr: {
-                            $and: [
-                              { $eq: ['$followed_user_id', '$$user_id'] },
-                              { $eq: ['$user_id', viewer_user_id_objectId] }
-                            ]
-                          }
+              {
+                $lookup: {
+                  from: 'followers',
+                  let: { user_id: '$_id' },
+                  pipeline: [
+                    {
+                      $match: {
+                        $expr: {
+                          $and: [
+                            { $eq: ['$followed_user_id', '$$user_id'] },
+                            { $eq: ['$user_id', viewer_user_id_objectId] }
+                          ]
                         }
                       }
-                    ],
-                    as: 'is_following_check'
-                  }
-                },
-                {
-                  $addFields: {
-                    is_following: { $gt: [{ $size: '$is_following_check' }, 0] }
-                  }
+                    }
+                  ],
+                  as: 'is_following_check'
                 }
-              ]
+              },
+              {
+                $addFields: {
+                  is_following: { $gt: [{ $size: '$is_following_check' }, 0] }
+                }
+              }
+            ]
             : []),
           {
             $project: {
