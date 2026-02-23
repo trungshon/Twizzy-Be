@@ -3,10 +3,10 @@ import { ReportReason, ReportStatus } from '~/constants/enum'
 
 interface ReportConstructor {
     _id?: ObjectId
-    user_id: ObjectId
+    user_ids: ObjectId[]
     twizz_id: ObjectId
-    reason: ReportReason
-    description?: string
+    reasons: ReportReason[]
+    descriptions?: string[]
     status?: ReportStatus
     action?: string
     admin_id?: ObjectId
@@ -17,10 +17,10 @@ interface ReportConstructor {
 
 export default class Report {
     _id?: ObjectId
-    user_id: ObjectId
+    user_ids: ObjectId[]
     twizz_id: ObjectId
-    reason: ReportReason
-    description: string
+    reasons: ReportReason[]
+    descriptions: string[]
     status: ReportStatus
     action?: string
     admin_id?: ObjectId
@@ -30,10 +30,10 @@ export default class Report {
 
     constructor({
         _id,
-        user_id,
+        user_ids,
         twizz_id,
-        reason,
-        description,
+        reasons,
+        descriptions,
         status,
         action,
         admin_id,
@@ -43,10 +43,10 @@ export default class Report {
     }: ReportConstructor) {
         const date = new Date()
         this._id = _id
-        this.user_id = user_id
+        this.user_ids = user_ids
         this.twizz_id = twizz_id
-        this.reason = reason
-        this.description = description || ''
+        this.reasons = reasons
+        this.descriptions = descriptions || []
         this.status = status || ReportStatus.Pending
         this.action = action
         this.admin_id = admin_id

@@ -142,3 +142,7 @@ export const CONVERSATION_MESSAGES = {
   GET_CONVERSATION_FAILED: 'Lấy cuộc trò chuyện thất bại'
 } as const
 
+export const REPORT_MESSAGES = {
+  ALREADY_REPORTED: 'Bạn đã báo cáo bài viết này rồi. Chúng tôi sẽ xử lý sớm nhất có thể.'
+} as const
+

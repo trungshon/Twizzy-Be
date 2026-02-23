@@ -5,6 +5,11 @@ import { ReportStatus, UserVerifyStatus, NotificationType } from '~/constants/en
 import adminService from './admin.services'
 import notificationsService from './notifications.services'
 import { io, users } from '~/utils/socket'
+import { ErrorWithStatus } from '~/models/Errors'
+import { HTTP_STATUS } from '~/constants/httpStatus'
+import { REPORT_MESSAGES } from '~/constants/messages'
+
+const REPORTING_THRESHOLD = 3
 
 class ReportsService {
     async createReport({
@@ -18,6 +23,36 @@ class ReportsService {
         reason: number
         description: string
     }) {
+        const existingReport = await databaseService.reports.findOne({
+            twizz_id: new ObjectId(twizz_id),
+            status: ReportStatus.Pending
+        })
+
+        if (existingReport) {
+            // Check if user has already reported
+            const hasReported = existingReport.user_ids.some((id) => id.toString() === user_id)
+            if (hasReported) {
+                throw new ErrorWithStatus({
+                    message: REPORT_MESSAGES.ALREADY_REPORTED,
+                    status: HTTP_STATUS.FORBIDDEN
+                })
+            }
+            const updateQuery: any = {
+                $addToSet: {
+                    user_ids: new ObjectId(user_id),
+                    reasons: reason
+                },
+                $set: { updated_at: new Date() }
+            }
+
+            if (description && description.trim() !== '') {
+                updateQuery.$addToSet.descriptions = description
+            }
+
+            await databaseService.reports.updateOne({ _id: existingReport._id }, updateQuery)
+            return existingReport
+        }
+
         // Create snapshot of the twizz
         const twizz = await databaseService.twizzs.findOne({ _id: new ObjectId(twizz_id) })
         let twizz_snapshot = null
@@ -72,10 +107,10 @@ class ReportsService {
         }
 
         const report = new Report({
-            user_id: new ObjectId(user_id),
+            user_ids: [new ObjectId(user_id)],
             twizz_id: new ObjectId(twizz_id),
-            reason,
-            description,
+            reasons: [reason],
+            descriptions: description && description.trim() !== '' ? [description] : [],
             twizz_snapshot
         })
         await databaseService.reports.insertOne(report)
@@ -94,6 +129,14 @@ class ReportsService {
         const filter: any = {}
         if (status !== undefined) {
             filter.status = status
+        }
+
+        // Only show to admin if threshold reached or if it's already processed
+        if (status === ReportStatus.Pending || status === undefined) {
+            filter.$or = [
+                { $expr: { $gte: [{ $size: '$user_ids' }, REPORTING_THRESHOLD] } },
+                { status: { $ne: ReportStatus.Pending } }
+            ]
         }
 
         const [reports, total] = await Promise.all([
@@ -141,12 +184,16 @@ class ReportsService {
                     {
                         $lookup: {
                             from: 'users',
-                            localField: 'user_id',
+                            localField: 'user_ids',
                             foreignField: '_id',
-                            as: 'reporter'
+                            as: 'reporters'
                         }
                     },
-                    { $unwind: { path: '$reporter', preserveNullAndEmptyArrays: true } },
+                    {
+                        $addFields: {
+                            reporter: { $arrayElemAt: ['$reporters', 0] }
+                        }
+                    },
                     // Lookup parent_twizz for nested twizz
                     {
                         $lookup: {
@@ -270,7 +317,7 @@ class ReportsService {
         page?: number
         limit?: number
     }) {
-        const filter = { user_id: new ObjectId(user_id) }
+        const filter = { user_ids: new ObjectId(user_id) }
 
         const [reports, total] = await Promise.all([
             databaseService.reports
@@ -403,7 +450,9 @@ class ReportsService {
                             parent_twizz: 0,
                             parent_user: 0,
                             grandparent_twizz: 0,
-                            grandparent_user: 0
+                            grandparent_user: 0,
+                            user_ids: 0,
+                            reporters: 0
                         }
                     }
                 ])
@@ -470,15 +519,7 @@ class ReportsService {
                             'twizz.user': { $ifNull: ['$twizz_user', '$twizz.user'] }
                         }
                     },
-                    {
-                        $lookup: {
-                            from: 'users',
-                            localField: 'user_id',
-                            foreignField: '_id',
-                            as: 'reporter'
-                        }
-                    },
-                    { $unwind: { path: '$reporter', preserveNullAndEmptyArrays: true } },
+
                     // Lookup parent_twizz for nested twizz
                     {
                         $lookup: {
@@ -575,7 +616,9 @@ class ReportsService {
                             parent_twizz: 0,
                             parent_user: 0,
                             grandparent_twizz: 0,
-                            grandparent_user: 0
+                            grandparent_user: 0,
+                            user_ids: 0,
+                            reporters: 0
                         }
                     }
                 ])
@@ -670,15 +713,19 @@ class ReportsService {
                 }
             }
 
-            // Send notification to reporter
-            await notificationsService.createNotification({
-                user_id: report.user_id.toString(),
-                sender_id: admin_id,
-                type: NotificationType.ReportResolved,
-                metadata: {
-                    report_id: report._id.toString()
-                }
-            })
+            // Send notification to all reporters
+            await Promise.all(
+                report.user_ids.map((uid: ObjectId) =>
+                    notificationsService.createNotification({
+                        user_id: uid.toString(),
+                        sender_id: admin_id,
+                        type: NotificationType.ReportResolved,
+                        metadata: {
+                            report_id: report._id!.toString()
+                        }
+                    })
+                )
+            )
         } else if (action === 'ban') {
             await databaseService.reports.updateOne(
                 { _id: new ObjectId(report_id) },
@@ -710,23 +757,27 @@ class ReportsService {
 
 
                 // Send notifications
+                const reporterNotifications = report.user_ids.map((uid: ObjectId) =>
+                    notificationsService.createNotification({
+                        user_id: uid.toString(),
+                        sender_id: admin_id,
+                        type: NotificationType.ReportResolved,
+                        metadata: {
+                            report_id: report._id!.toString()
+                        }
+                    })
+                )
+
                 await Promise.all([
                     notificationsService.createNotification({
                         user_id: twizz_user_id.toString(),
                         sender_id: admin_id,
                         type: NotificationType.AccountBanned,
                         metadata: {
-                            report_id: report._id.toString()
+                            report_id: report._id!.toString()
                         }
                     }),
-                    notificationsService.createNotification({
-                        user_id: report.user_id.toString(),
-                        sender_id: admin_id,
-                        type: NotificationType.ReportResolved,
-                        metadata: {
-                            report_id: report._id.toString()
-                        }
-                    })
+                    ...reporterNotifications
                 ])
 
                 // Emit socket event for status change
@@ -748,22 +799,27 @@ class ReportsService {
                 }
             )
 
-            // Send notification to reporter
-            await notificationsService.createNotification({
-                user_id: report.user_id.toString(),
-                sender_id: admin_id,
-                type: NotificationType.ReportIgnored,
-                metadata: {
-                    report_id: report._id.toString()
+            // Send notification to all reporters
+            await Promise.all(
+                report.user_ids.map((uid: ObjectId) =>
+                    notificationsService.createNotification({
+                        user_id: uid.toString(),
+                        sender_id: admin_id,
+                        type: NotificationType.ReportIgnored,
+                        metadata: {
+                            report_id: report._id!.toString()
+                        }
+                    })
+                )
+            )
+
+            // Emit socket events
+            report.user_ids.forEach((uid: ObjectId) => {
+                const reporterSocketId = users[uid.toString()]?.socket_id
+                if (reporterSocketId) {
+                    io.to(reporterSocketId).emit('user_status_changed', { verify: ReportStatus.Ignored })
                 }
             })
-
-            // Emit socket event for status change (Ignored still might update status if it was changed manually before)
-            // But usually only Ban/Verify matters. However, for consistency:
-            const reporterSocketId = users[report.user_id.toString()]?.socket_id
-            if (reporterSocketId) {
-                io.to(reporterSocketId).emit('user_status_changed', { verify: ReportStatus.Ignored })
-            }
         }
         return true
     }
