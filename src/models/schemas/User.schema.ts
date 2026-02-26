@@ -28,6 +28,7 @@ interface UserType {
   username_changed?: boolean
   role?: UserRole
   violation_count?: number
+  fcm_tokens?: string[] // FCM token cho push notification
 }
 
 export default class User {
@@ -57,6 +58,7 @@ export default class User {
   username_changed: boolean
   role: UserRole
   violation_count: number
+  fcm_tokens: string[]
 
   constructor(user: UserType) {
     const date = new Date()
@@ -85,6 +87,7 @@ export default class User {
     this.username_changed = user.username_changed || false
     this.role = user.role ?? UserRole.User
     this.violation_count = user.violation_count || 0
+    this.fcm_tokens = user.fcm_tokens || []
   }
 }
 

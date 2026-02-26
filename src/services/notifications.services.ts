@@ -3,6 +3,7 @@ import databaseService from './database.services'
 import Notification from '~/models/schemas/Notification.schema'
 import { NotificationType, TwizzType, TwizzAudience } from '~/constants/enum'
 import { io, users } from '~/utils/socket'
+import firebaseService from './firebase.services'
 
 class NotificationsService {
     async createNotification(payload: {
@@ -42,14 +43,29 @@ class NotificationsService {
 
         const notificationId = result?._id as ObjectId | undefined
 
-        // Populate and emit via socket
+        // Populate và gửi qua socket + FCM
         if (notificationId) {
             const populatedNotification = await this.getNotificationById(notificationId.toString(), payload.user_id)
             if (populatedNotification) {
+                // Gửi qua Socket.IO (cho app đang mở)
                 const recipientSocketId = users[payload.user_id]?.socket_id
                 if (recipientSocketId) {
                     io.to(recipientSocketId).emit('notification', populatedNotification)
                 }
+
+                // Gửi qua FCM (cho app ở background/tắt hẳn)
+                const senderName = populatedNotification?.sender?.name || 'Ai đó'
+                const fcmBody = this.getFcmBody(payload.type)
+                await firebaseService.sendNotification({
+                    user_id: payload.user_id,
+                    title: senderName,
+                    body: fcmBody,
+                    data: {
+                        type: payload.type.toString(),
+                        notification_id: notificationId.toString(),
+                        twizz_id: payload.twizz_id || '',
+                    }
+                })
             }
         }
 
@@ -555,6 +571,33 @@ class NotificationsService {
         )
 
         return databaseService.notifications.aggregate(pipeline).toArray()
+    }
+    /**
+     * Tạo nội dung body cho FCM notification dựa theo loại
+     */
+    private getFcmBody(type: NotificationType): string {
+        switch (type) {
+            case NotificationType.Like:
+                return 'đã thích bài viết của bạn'
+            case NotificationType.Comment:
+                return 'đã bình luận bài viết của bạn'
+            case NotificationType.QuoteTwizz:
+                return 'đã trích dẫn bài viết của bạn'
+            case NotificationType.Follow:
+                return 'đã bắt đầu theo dõi bạn'
+            case NotificationType.Mention:
+                return 'đã nhắc đến bạn trong một bài viết'
+            case NotificationType.ReportResolved:
+                return 'Báo cáo của bạn đã được xử lý'
+            case NotificationType.ReportIgnored:
+                return 'Báo cáo của bạn đã được xem xét'
+            case NotificationType.PostDeleted:
+                return 'Bài viết của bạn đã bị gỡ bỏ'
+            case NotificationType.AccountBanned:
+                return 'Tài khoản của bạn đã bị khóa'
+            default:
+                return 'Bạn có thông báo mới'
+        }
     }
 }
 

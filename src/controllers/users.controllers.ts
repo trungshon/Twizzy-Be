@@ -25,6 +25,7 @@ import { HTTP_STATUS } from '~/constants/httpStatus'
 import { UserVerifyStatus } from '~/constants/enum'
 import { pick } from 'lodash'
 import { config } from 'dotenv'
+import firebaseService from '~/services/firebase.services'
 config()
 
 export const loginController = async (req: Request, res: Response) => {
@@ -285,4 +286,24 @@ export const getFollowingController = async (req: Request, res: Response, next: 
     message: USER_MESSAGES.GET_FOLLOWING_SUCCESSFULLY,
     result
   })
+}
+
+/**
+ * Đăng ký FCM token cho push notification
+ */
+export const registerFcmTokenController = async (req: Request, res: Response) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const { fcm_token } = req.body
+  await firebaseService.saveFcmToken(user_id, fcm_token)
+  return res.json({ message: 'FCM token đã được đăng ký' })
+}
+
+/**
+ * Xóa FCM token (khi logout)
+ */
+export const removeFcmTokenController = async (req: Request, res: Response) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const { fcm_token } = req.body
+  await firebaseService.removeFcmToken(user_id, fcm_token)
+  return res.json({ message: 'FCM token đã được xóa' })
 }

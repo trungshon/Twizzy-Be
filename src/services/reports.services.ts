@@ -9,7 +9,7 @@ import { ErrorWithStatus } from '~/models/Errors'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { REPORT_MESSAGES } from '~/constants/messages'
 
-const REPORTING_THRESHOLD = 3
+const REPORTING_THRESHOLD = 1
 
 class ReportsService {
     async createReport({
@@ -23,6 +23,15 @@ class ReportsService {
         reason: number
         description: string
     }) {
+        // Kiểm tra không được báo cáo bài viết của chính mình
+        const reportedTwizz = await databaseService.twizzs.findOne({ _id: new ObjectId(twizz_id) })
+        if (reportedTwizz && reportedTwizz.user_id.toString() === user_id) {
+            throw new ErrorWithStatus({
+                message: 'Không thể báo cáo bài viết của chính mình',
+                status: HTTP_STATUS.FORBIDDEN
+            })
+        }
+
         const existingReport = await databaseService.reports.findOne({
             twizz_id: new ObjectId(twizz_id),
             status: ReportStatus.Pending

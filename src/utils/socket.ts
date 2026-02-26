@@ -9,6 +9,7 @@ import Conversation from "~/models/schemas/Conversations.schema"
 import databaseService from "~/services/database.services"
 import { verifyAccessToken } from "./commons"
 import { Server } from "socket.io"
+import firebaseService from "~/services/firebase.services"
 
 export let io: Server
 export const users: {
@@ -131,6 +132,18 @@ const initSocket = (httpServer: ServerHttp) => {
 
             if (receiver_socket_id) {
                 socket.to(receiver_socket_id).emit('receive_message', messagePayload)
+            } else {
+                // Người nhận không online → gửi FCM push notification
+                await firebaseService.sendNotification({
+                    user_id: receiver_id,
+                    title: sender?.name || 'Tin nhắn mới',
+                    body: content,
+                    data: {
+                        type: 'message',
+                        sender_id: sender_id,
+                        conversation_id: conversation._id!.toString(),
+                    }
+                })
             }
             // Also emit back to the sender for confirmation/UI update
             socket.emit('receive_message', messagePayload)

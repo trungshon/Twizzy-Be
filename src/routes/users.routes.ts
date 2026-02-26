@@ -34,7 +34,9 @@ import {
   oauthController,
   oauthMobileController,
   getFollowersController,
-  getFollowingController
+  getFollowingController,
+  registerFcmTokenController,
+  removeFcmTokenController
 } from '../controllers/users.controllers'
 import wrapRequestHandler from '~/utils/handlers'
 import { USER_MESSAGES } from '~/constants/messages'
@@ -319,4 +321,31 @@ usersRouter.put(
   changePasswordValidator,
   wrapRequestHandler(changePasswordController)
 )
+
+/**
+ * @description Đăng ký FCM token cho push notification
+ * @path /users/fcm-token
+ * @method POST
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ * @body {
+ *   fcm_token: string
+ * }
+ */
+usersRouter.post('/fcm-token', accessTokenValidator, wrapRequestHandler(registerFcmTokenController))
+
+/**
+ * @description Xóa FCM token (khi logout)
+ * @path /users/fcm-token/remove
+ * @method POST
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ * @body {
+ *   fcm_token: string
+ * }
+ */
+usersRouter.post('/fcm-token/remove', accessTokenValidator, wrapRequestHandler(removeFcmTokenController))
+
 export default usersRouter
