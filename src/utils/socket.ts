@@ -75,7 +75,7 @@ const initSocket = (httpServer: ServerHttp) => {
                 })
             }
 
-            const { receiver_id, sender_id, content } = data.payload
+            const { receiver_id, sender_id, content, medias } = data.payload
             const receiver_socket_id = users[receiver_id]?.socket_id
 
             // Check if receiver follows sender
@@ -104,7 +104,8 @@ const initSocket = (httpServer: ServerHttp) => {
             const conversation = new Conversation({
                 sender_id: new ObjectId(sender_id),
                 receiver_id: new ObjectId(receiver_id),
-                content: content,
+                content: content || '',
+                medias: medias || [],
                 is_accepted: is_accepted
             })
             const result = await databaseService.conversations.insertOne(conversation)
@@ -137,7 +138,7 @@ const initSocket = (httpServer: ServerHttp) => {
                 await firebaseService.sendNotification({
                     user_id: receiver_id,
                     title: sender?.name || 'Tin nhắn mới',
-                    body: content,
+                    body: content || (medias?.length > 0 ? (medias[0].type === 0 ? 'Đã gửi ảnh' : 'Đã gửi video') : 'Tin nhắn mới'),
                     data: {
                         type: 'message',
                         sender_id: sender_id,
