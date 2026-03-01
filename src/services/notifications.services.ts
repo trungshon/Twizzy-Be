@@ -64,6 +64,13 @@ class NotificationsService {
                         type: payload.type.toString(),
                         notification_id: notificationId.toString(),
                         twizz_id: payload.twizz_id || '',
+                        // Thêm thông tin sender cho navigation (follow → userProfile)
+                        sender_id: payload.sender_id,
+                        sender_username: populatedNotification?.sender?.username || '',
+                        sender_name: populatedNotification?.sender?.name || '',
+                        sender_avatar: populatedNotification?.sender?.avatar || '',
+                        // Thêm report_id cho navigation (report → reportDetail)
+                        report_id: payload.metadata?.report_id || '',
                     }
                 })
             }

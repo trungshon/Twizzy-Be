@@ -141,6 +141,9 @@ const initSocket = (httpServer: ServerHttp) => {
                     data: {
                         type: 'message',
                         sender_id: sender_id,
+                        sender_name: sender?.name || '',
+                        sender_username: sender?.username || '',
+                        sender_avatar: sender?.avatar || '',
                         conversation_id: conversation._id!.toString(),
                     }
                 })
