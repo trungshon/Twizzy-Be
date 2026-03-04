@@ -41,6 +41,8 @@
   "dependencies": {
     "@azure/storage-blob": "^12.29.1",
     "@faker-js/faker": "^10.2.0",
+    "@google-cloud/vision": "^5.3.4",
+    "@google/generative-ai": "^0.24.1",
     "@types/bcrypt": "^6.0.0",
     "@types/nodemailer": "^7.0.5",
     "@types/uuid": "^10.0.0",

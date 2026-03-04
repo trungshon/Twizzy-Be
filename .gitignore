@@ -4,3 +4,4 @@ dist/
 uploads/
 docs/
 firebase-service-account.json
+src/config/gcp-key.json

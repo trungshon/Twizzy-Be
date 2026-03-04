@@ -5,9 +5,41 @@ import { Pagination, TweetQuery, TwizzParam, TwizzReqBody } from '~/models/reque
 import twizzsService from '~/services/twizzs.services'
 import { TWIZZ_MESSAGES } from '~/constants/messages'
 import { TwizzType } from '~/constants/enum'
+import { HTTP_STATUS } from '~/constants/httpStatus'
+import moderationService from '~/services/moderation.services'
 
 export const createTwizzController = async (req: Request<ParamsDictionary, any, TwizzReqBody>, res: Response) => {
   const { user_id } = req.decoded_authorization as TokenPayload
+
+  // ========== Kiểm duyệt nội dung trước khi đăng ==========
+  // Chạy song song: kiểm duyệt văn bản (Gemini) + ảnh (Vision)
+  const moderation = await moderationService.moderateContent({
+    content: req.body.content,
+    medias: req.body.medias
+  })
+
+  // Nếu vi phạm → log chi tiết + từ chối đăng bài
+  if (!moderation.passed) {
+    // Log chi tiết lên server terminal
+    console.log('\n========== [Moderation] BÀI VIẾT BỊ TỪ CHỐI ==========')
+    console.log(`[Moderation] User ID: ${user_id}`)
+    console.log(`[Moderation] Nội dung: "${req.body.content?.substring(0, 100)}..."`)
+    console.log(`[Moderation] Số media: ${req.body.medias?.length || 0}`)
+    moderation.violations.forEach((v, i) => {
+      console.log(`[Moderation] Vi phạm ${i + 1}: [${v.type}] ${v.reason}`)
+    })
+    console.log('=======================================================\n')
+
+    // Ghép tất cả lý do vi phạm thành 1 chuỗi để hiện trên app
+    const violationReasons = moderation.violations.map(v => v.reason).join('; ')
+
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      message: `Bài viết vi phạm tiêu chuẩn cộng đồng: ${violationReasons}`,
+      violations: moderation.violations
+    })
+  }
+
+  // Nội dung hợp lệ → tiến hành đăng bài
   const result = await twizzsService.createTwizz(user_id, req.body)
   return res.json({
     message: TWIZZ_MESSAGES.CREATE_TWIZZ_SUCCESSFULLY,
