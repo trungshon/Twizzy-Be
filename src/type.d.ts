@@ -14,3 +14,6 @@ declare module 'express' {
     twizz?: Twizz
   }
 }
+
+// Sightengine không có type definitions riêng → khai báo module để TypeScript chấp nhận
+declare module 'sightengine'

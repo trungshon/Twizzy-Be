@@ -1,13 +1,14 @@
 import vision from '@google-cloud/vision'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 import { Media } from '~/models/Other'
 import { MediaType } from '~/constants/enum'
 
 // ========== Kết quả kiểm duyệt ==========
 
-// Kết quả vi phạm cho từng loại (text/image)
+// Kết quả vi phạm cho từng loại (text/image/video)
 interface ModerationViolation {
-    type: 'text' | 'image'           // Loại vi phạm
+    type: 'text' | 'image' | 'video' // Loại vi phạm
     reason: string                    // Lý do cụ thể (tiếng Việt)
 }
 
@@ -172,7 +173,89 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
     }
 
     // ====================================================
-    // KIỂM DUYỆT TỔNG THỂ - Kết hợp text + image
+    // KIỂM DUYỆT VIDEO - Sử dụng Sightengine API
+    // ====================================================
+    // Gửi URL video cho Sightengine → nhận kết quả kiểm duyệt
+    // Kiểm tra: nudity, violence, offensive, drugs, weapons, gore
+    async moderateVideo(videoUrl: string): Promise<ModerationResult> {
+        try {
+            console.log(`[Moderation] Đang kiểm duyệt video: ${videoUrl}`)
+
+            // Gọi Sightengine API kiểm duyệt video qua URL (theo docs chính thức)
+            // Dùng axios + FormData để POST lên endpoint check-sync.json
+            const FormData = require('form-data')
+            const axios = require('axios')
+
+            const data = new FormData()
+            data.append('stream_url', videoUrl)
+            data.append('models', 'nudity-2.1,violence,gore')
+            data.append('api_user', process.env.SIGHTENGINE_USER as string)
+            data.append('api_secret', process.env.SIGHTENGINE_SECRET as string)
+
+            const response = await axios({
+                method: 'post',
+                url: 'https://api.sightengine.com/1.0/video/check-sync.json',
+                data,
+                headers: data.getHeaders(),
+                timeout: 90000   // Timeout 90s vì video cần thời gian xử lý
+            })
+            const result = response.data
+            console.log('[Moderation] Kết quả Sightengine:', JSON.stringify(result, null, 2))
+
+            const violations: ModerationViolation[] = []
+
+            // result.data.frames là mảng các frame snapshot của video
+            const frames: any[] = result?.data?.frames ?? []
+
+            for (const frame of frames) {
+                // ---- Nudity 2.1: sexual_activity, sexual_display, erotica + very_suggestive ----
+                if (frame.nudity) {
+                    const { sexual_activity = 0, sexual_display = 0, erotica = 0, very_suggestive = 0 } = frame.nudity
+                    const contextPool = frame.nudity.context?.sea_lake_pool ?? 0
+
+                    const isExplicit = sexual_activity > 0.7 || sexual_display > 0.7 || erotica > 0.75
+
+                    // 2. Suggestive content (gợi cảm mạnh) NHƯNG không phải ở biển/hồ bơi
+                    const isInappropriateSuggestive = very_suggestive > 0.8 && contextPool < 0.5
+
+                    if (isExplicit || isInappropriateSuggestive) {
+                        if (!violations.some(v => v.reason.includes('khiêu dâm'))) {
+                            violations.push({ type: 'video', reason: 'Video chứa nội dung khiêu dâm hoặc khêu gợi quá mức' })
+                        }
+                    }
+                }
+
+                // ---- Violence ----
+                if ((frame.violence?.prob ?? 0) > 0.75) {
+                    if (!violations.some(v => v.reason.includes('bạo lực'))) {
+                        violations.push({ type: 'video', reason: 'Video chứa nội dung bạo lực' })
+                    }
+                }
+
+                // ---- Gore (máu me, kinh dị) ----
+                if ((frame.gore?.prob ?? 0) > 0.75) {
+                    if (!violations.some(v => v.reason.includes('kinh dị'))) {
+                        violations.push({ type: 'video', reason: 'Video chứa nội dung máu me, kinh dị' })
+                    }
+                }
+            }
+
+            console.log(`[Moderation] Video → ${violations.length === 0 ? 'Hợp lệ' : `Vi phạm: ${violations.map(v => v.reason).join(', ')}`}`)
+
+            return {
+                passed: violations.length === 0,
+                violations
+            }
+
+        } catch (error) {
+            // Nếu Sightengine API lỗi → cho qua (không block user)
+            console.error('[Moderation] Lỗi kiểm duyệt video:', error)
+            return { passed: true, violations: [] }
+        }
+    }
+
+    // ====================================================
+    // KIỂM DUYỆT TỔNG THỂ - Kết hợp text + image + video
     // ====================================================
     // Chạy song song tất cả kiểm duyệt bằng Promise.all
     // Nếu BẤT KỲ phần nào vi phạm → reject toàn bộ bài viết
@@ -180,15 +263,34 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
         // Tạo danh sách các promise kiểm duyệt
         const moderationTasks: Promise<ModerationResult>[] = []
 
-        // 1. Kiểm duyệt văn bản (nếu có nội dung)
-        if (content && content.trim() !== '') {
+        // 1. Kiểm duyệt văn bản (nếu có nội dung và được bật)
+        const isTextModerationEnabled = process.env.MODERATE_TEXT !== 'false'
+        if (isTextModerationEnabled && content && content.trim() !== '') {
             moderationTasks.push(this.moderateText(content))
+        } else if (!isTextModerationEnabled) {
+            console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt TEXT (bị tắt trong .env)')
         }
 
-        // 2. Kiểm duyệt từng ảnh (chỉ ảnh, không check video ở đây)
-        const imageMedias = medias.filter(m => m.type === MediaType.Image)
-        for (const media of imageMedias) {
-            moderationTasks.push(this.moderateImage(media.url))
+        // 2. Kiểm duyệt từng ảnh (nếu được bật)
+        const isImageModerationEnabled = process.env.MODERATE_IMAGE !== 'false'
+        if (isImageModerationEnabled) {
+            const imageMedias = medias.filter(m => m.type === MediaType.Image)
+            for (const media of imageMedias) {
+                moderationTasks.push(this.moderateImage(media.url))
+            }
+        } else {
+            console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt IMAGE (bị tắt trong .env)')
+        }
+
+        // 3. Kiểm duyệt từng video bằng Sightengine (nếu được bật)
+        const isVideoModerationEnabled = process.env.MODERATE_VIDEO !== 'false'
+        if (isVideoModerationEnabled) {
+            const videoMedias = medias.filter(m => m.type === MediaType.Video)
+            for (const media of videoMedias) {
+                moderationTasks.push(this.moderateVideo(media.url))
+            }
+        } else {
+            console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt VIDEO (bị tắt trong .env)')
         }
 
         // Nếu không có gì cần kiểm duyệt → cho qua
