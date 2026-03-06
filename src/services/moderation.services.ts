@@ -210,13 +210,15 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
             for (const frame of frames) {
                 // ---- Nudity 2.1: sexual_activity, sexual_display, erotica + very_suggestive ----
                 if (frame.nudity) {
-                    const { sexual_activity = 0, sexual_display = 0, erotica = 0, very_suggestive = 0 } = frame.nudity
-                    const contextPool = frame.nudity.context?.sea_lake_pool ?? 0
-
+                    const { sexual_activity = 0, sexual_display = 0, erotica = 0, very_suggestive = 0, mildly_suggestive = 0 } = frame.nudity
                     const isExplicit = sexual_activity > 0.7 || sexual_display > 0.7 || erotica > 0.75
 
-                    // 2. Suggestive content (gợi cảm mạnh) NHƯNG không phải ở biển/hồ bơi
-                    const isInappropriateSuggestive = very_suggestive > 0.8 && contextPool < 0.5
+                    // 2. Nội dung khêu gợi (Bỏ qua hoàn toàn bối cảnh)
+                    // Chặn nếu "rất khêu gợi" > 80% HOẶC "hơi khêu gợi" (ví dụ: mặc bikini, thiếu vải) > 80%
+                    const hasSuggestivePose = very_suggestive > 0.8
+                    const hasMildlySuggestiveAttire = mildly_suggestive > 0.8
+
+                    const isInappropriateSuggestive = hasSuggestivePose || hasMildlySuggestiveAttire
 
                     if (isExplicit || isInappropriateSuggestive) {
                         if (!violations.some(v => v.reason.includes('khiêu dâm'))) {
@@ -304,9 +306,14 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
         // Gom tất cả vi phạm từ các kết quả
         const allViolations = results.flatMap(r => r.violations)
 
+        // Lọc bỏ các vi phạm trùng lặp lý do (khi đăng nhiều ảnh cùng vi phạm 1 lỗi)
+        const uniqueViolations = allViolations.filter((v, index, self) =>
+            index === self.findIndex((t) => t.reason === v.reason)
+        )
+
         return {
-            passed: allViolations.length === 0,   // Hợp lệ nếu không có vi phạm nào
-            violations: allViolations              // Danh sách tất cả vi phạm
+            passed: uniqueViolations.length === 0,   // Hợp lệ nếu không có vi phạm nào
+            violations: uniqueViolations              // Danh sách các vi phạm (không trùng lặp)
         }
     }
 }
