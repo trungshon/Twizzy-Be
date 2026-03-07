@@ -42,7 +42,7 @@ class ModerationService {
         }
 
         try {
-            // Sử dụng model gemini-2.0-flash (nhanh, miễn phí)
+            // Sử dụng model gemini-2.5-flash 
             const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
             // Prompt yêu cầu Gemini phân tích nội dung
@@ -116,10 +116,20 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
     // SafeSearch phát hiện: adult, violence, racy, spoof, medical
     async moderateImage(imageUrl: string): Promise<ModerationResult> {
         try {
-            // Gọi Vision API SafeSearch Detection
-            // Truyền URL ảnh (Cloudinary URL) trực tiếp
-            const [result] = await visionClient.safeSearchDetection(imageUrl)
+            // Gọi Vision API annotateImage để lấy SafeSearch và LabelDetection cùng lúc
+            const [result] = await visionClient.annotateImage({
+                image: { source: { imageUri: imageUrl } },
+                features: [
+                    { type: 'SAFE_SEARCH_DETECTION' },
+                    { type: 'LABEL_DETECTION' }
+                ]
+            })
+
             const safeSearch = result.safeSearchAnnotation
+            const labels = result.labelAnnotations || []
+
+            console.log('[Moderation] Kết quả Vision API (SafeSearch):', JSON.stringify(safeSearch, null, 2))
+            console.log('[Moderation] Kết quả Vision API (Labels):', labels.map(l => l.description).join(', '))
 
             // Nếu không có kết quả → cho qua
             if (!safeSearch) {
@@ -149,16 +159,35 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
             }
 
             // Kiểm tra nội dung khiêu gợi (racy)
-            // Chỉ block khi VERY_LIKELY (racy có thể là ảnh bikini, bãi biển...)
+            // Chỉ block khi VERY_LIKELY. TUY NHIÊN, bỏ qua nếu bối cảnh là bãi biển/đồ bơi
             if (safeSearch.racy === 'VERY_LIKELY') {
-                violations.push({
-                    type: 'image',
-                    reason: 'Ảnh chứa nội dung khiêu gợi'
+                // Các keyword hợp lệ biện minh cho ảnh khiêu gợi (Phải là MÔI TRƯỜNG/BỐI CẢNH như biển, bể bơi...)
+                // NGHIÊM CẤM đưa các từ khóa quần áo (bikini, swimsuit, underwear, lingerie) vào đây 
+                // vì mặc bikini trong nhà vẫn là vi phạm ngữ cảnh.
+                const allowedContextKeywords = [
+                    'beach', 'pool', 'swimming', 'water', 'sea', 'ocean',
+                    'vacation', 'coast', 'sand', 'resort', 'outdoor'
+                ]
+
+                // Kiểm tra xem hình ảnh có chứa label nào trùng với keyword cho phép không
+                const hasAllowedContext = labels.some(label => {
+                    const desc = label.description?.toLowerCase() || ''
+                    return allowedContextKeywords.some(kw => desc.includes(kw))
                 })
+
+                if (!hasAllowedContext) {
+                    violations.push({
+                        type: 'image',
+                        reason: 'Ảnh chứa nội dung khiêu gợi không phù hợp ngữ cảnh'
+                    })
+                } else {
+                    console.log(`[Moderation] Bỏ qua lỗi RACY vì phát hiện ngữ cảnh hợp lệ (Biển/Hồ bơi/Đồ bơi)`)
+                }
             }
 
             // Log kết quả
-            console.log(`[Moderation] Ảnh: adult=${safeSearch.adult}, violence=${safeSearch.violence}, racy=${safeSearch.racy} → ${violations.length === 0 ? 'Hợp lệ' : 'Vi phạm'}`)
+            const isRacyBlocked = violations.some(v => v.reason.includes('khiêu gợi'))
+            console.log(`[Moderation] Ảnh: adult=${safeSearch.adult}, violence=${safeSearch.violence}, racy=${safeSearch.racy} (Blocked: ${isRacyBlocked}) → ${violations.length === 0 ? 'Hợp lệ' : 'Vi phạm'}`)
 
             return {
                 passed: violations.length === 0,
@@ -176,7 +205,7 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
     // KIỂM DUYỆT VIDEO - Sử dụng Sightengine API
     // ====================================================
     // Gửi URL video cho Sightengine → nhận kết quả kiểm duyệt
-    // Kiểm tra: nudity, violence, offensive, drugs, weapons, gore
+    // Kiểm tra: nudity, violence, gore
     async moderateVideo(videoUrl: string): Promise<ModerationResult> {
         try {
             console.log(`[Moderation] Đang kiểm duyệt video: ${videoUrl}`)
@@ -213,16 +242,25 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
                     const { sexual_activity = 0, sexual_display = 0, erotica = 0, very_suggestive = 0, mildly_suggestive = 0 } = frame.nudity
                     const isExplicit = sexual_activity > 0.7 || sexual_display > 0.7 || erotica > 0.75
 
-                    // 2. Nội dung khêu gợi (Bỏ qua hoàn toàn bối cảnh)
-                    // Chặn nếu "rất khêu gợi" > 80% HOẶC "hơi khêu gợi" (ví dụ: mặc bikini, thiếu vải) > 80%
-                    const hasSuggestivePose = very_suggestive > 0.8
-                    const hasMildlySuggestiveAttire = mildly_suggestive > 0.8
+                    // Nội dung khêu gợi
+                    const isSuggestive = very_suggestive > 0.7 || mildly_suggestive > 0.7
 
-                    const isInappropriateSuggestive = hasSuggestivePose || hasMildlySuggestiveAttire
+                    // Lấy bối cảnh (nếu API có hỗ trợ trả về)
+                    const context = frame.nudity.context || {}
+                    const isBeachOrPool = (context.sea_lake_pool || 0) > 0.5 || (context.outdoor_other || 0) > 0.7
 
-                    if (isExplicit || isInappropriateSuggestive) {
+                    if (isExplicit) {
                         if (!violations.some(v => v.reason.includes('khiêu dâm'))) {
                             violations.push({ type: 'video', reason: 'Video chứa nội dung khiêu dâm hoặc khêu gợi quá mức' })
+                        }
+                    } else if (isSuggestive) {
+                        if (isBeachOrPool) {
+                            // Hợp lệ nếu ở biển/hồ bơi
+                            console.log(`[Moderation] Bỏ qua lỗi KHÊU GỢI cho video vì phát hiện bối cảnh hợp lệ (sea_lake_pool: ${context.sea_lake_pool})`)
+                        } else {
+                            if (!violations.some(v => v.reason.includes('khêu gợi'))) {
+                                violations.push({ type: 'video', reason: 'Video chứa nội dung khêu gợi không phù hợp ngữ cảnh' })
+                            }
                         }
                     }
                 }

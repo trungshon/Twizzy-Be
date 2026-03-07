@@ -9,7 +9,7 @@ import { ErrorWithStatus } from '~/models/Errors'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { REPORT_MESSAGES } from '~/constants/messages'
 
-const REPORTING_THRESHOLD = 1
+const REPORTING_THRESHOLD = 3
 
 class ReportsService {
     async createReport({
