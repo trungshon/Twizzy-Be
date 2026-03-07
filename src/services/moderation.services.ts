@@ -116,20 +116,16 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
     // SafeSearch phát hiện: adult, violence, racy, spoof, medical
     async moderateImage(imageUrl: string): Promise<ModerationResult> {
         try {
-            // Gọi Vision API annotateImage để lấy SafeSearch và LabelDetection cùng lúc
+            // BƯỚC 1: Chỉ gọi Vision API lấy SafeSearch Detection để tiết kiệm chi phí
             const [result] = await visionClient.annotateImage({
                 image: { source: { imageUri: imageUrl } },
                 features: [
-                    { type: 'SAFE_SEARCH_DETECTION' },
-                    { type: 'LABEL_DETECTION' }
+                    { type: 'SAFE_SEARCH_DETECTION' }
                 ]
             })
 
             const safeSearch = result.safeSearchAnnotation
-            const labels = result.labelAnnotations || []
-
             console.log('[Moderation] Kết quả Vision API (SafeSearch):', JSON.stringify(safeSearch, null, 2))
-            console.log('[Moderation] Kết quả Vision API (Labels):', labels.map(l => l.description).join(', '))
 
             // Nếu không có kết quả → cho qua
             if (!safeSearch) {
@@ -159,8 +155,20 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
             }
 
             // Kiểm tra nội dung khiêu gợi (racy)
-            // Chỉ block khi VERY_LIKELY. TUY NHIÊN, bỏ qua nếu bối cảnh là bãi biển/đồ bơi
+            // BƯỚC 2: Nếu bị đánh dấu racy, LÚC NÀY MỚI GỌI API để quét nhãn (Label) nhằm đọc bối cảnh
             if (safeSearch.racy === 'VERY_LIKELY') {
+                console.log('[Moderation] Ảnh bị đánh dấu RACY, tiến hành gọi thêm LABEL_DETECTION để xem xét bối cảnh...')
+
+                const [labelResult] = await visionClient.annotateImage({
+                    image: { source: { imageUri: imageUrl } },
+                    features: [
+                        { type: 'LABEL_DETECTION' }
+                    ]
+                })
+
+                const labels = labelResult.labelAnnotations || []
+                console.log('[Moderation] Kết quả Vision API (Labels - Fallback):', labels.map(l => l.description).join(', '))
+
                 // Các keyword hợp lệ biện minh cho ảnh khiêu gợi (Phải là MÔI TRƯỜNG/BỐI CẢNH như biển, bể bơi...)
                 // NGHIÊM CẤM đưa các từ khóa quần áo (bikini, swimsuit, underwear, lingerie) vào đây 
                 // vì mặc bikini trong nhà vẫn là vi phạm ngữ cảnh.
@@ -181,7 +189,7 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
                         reason: 'Ảnh chứa nội dung khiêu gợi không phù hợp ngữ cảnh'
                     })
                 } else {
-                    console.log(`[Moderation] Bỏ qua lỗi RACY vì phát hiện ngữ cảnh hợp lệ (Biển/Hồ bơi/Đồ bơi)`)
+                    console.log(`[Moderation] Bỏ qua lỗi RACY vì phát hiện ngữ cảnh hợp lệ (Biển/Hồ bơi/Đồ bơi) qua fallback label detection`)
                 }
             }
 
