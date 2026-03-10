@@ -5,3 +5,5 @@ uploads/
 docs/
 firebase-service-account.json
 src/config/gcp-key.json
+diagrams/
+scripts/

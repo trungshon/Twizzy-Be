@@ -47,8 +47,8 @@ class ModerationService {
 
             // Prompt yêu cầu Gemini phân tích nội dung
             // Trả về JSON chuẩn để dễ parse
-            const prompt = `Bạn là hệ thống kiểm duyệt nội dung mạng xã hội.
-Hãy phân tích nội dung sau và đánh giá xem có vi phạm tiêu chuẩn cộng đồng không.
+            const prompt = `Bạn là một hệ thống kiểm duyệt nội dung mạng xã hội thông minh và thấu hiểu ngữ cảnh cho người dùng Việt Nam.
+Hãy phân tích nội dung sau và đánh giá xem có thực sự vi phạm tiêu chuẩn cộng đồng không.
 
 Nội dung cần kiểm tra:
 """
@@ -57,11 +57,16 @@ ${content}
 
 Các tiêu chí vi phạm:
 1. Ngôn từ thù ghét, phân biệt chủng tộc, giới tính, tôn giáo
-2. Đe dọa, bạo lực, kích động bạo lực
+2. Đe dọa, bạo lực, kích động bạo lực (thực sự)
 3. Nội dung khiêu dâm, tình dục
-4. Quấy rối, bắt nạt, xúc phạm cá nhân
+4. Quấy rối, bắt nạt, xúc phạm cá nhân (có chủ đích tấn công ác ý)
 5. Tự gây hại, khuyến khích tự tử
 6. Thông tin sai lệch nghiêm trọng, lừa đảo
+
+QUY TẮC QUAN TRỌNG VỀ NGỮ CẢNH (BẮT BUỘC TUÂN THỦ):
+- Phải phân biệt được giữa LỜI CHỬI RỦA/TẤN CÔNG ÁC Ý thật sự với NHỮNG LỜI NÓI ĐÙA GIỠN, SLANG, TEENCODE thông thường của bạn bè.
+- TUYỆT ĐỐI BỎ QUA VÀ CHO PHÉP các câu chửi thề mang tính cảm thán, đùa cợt, gọi bạn bè thân thiết thân mật  NẾU CHÚNG KHÔNG ĐI KÈM HÀNH ĐỘNG ĐE DỌA THỰC SỰ HAY THÙ GHÉT MỘT ĐỐI TƯỢNG CỤ THỂ.
+- Chỉ phạt khi phát hiện chủ đích TẤN CÔNG, LĂNG MẠ, ĐE DỌA nhắm vào nạn nhân rõ ràng một cách độc hại.
 
 Quy tắc trả kết quả:
 - Nếu vi phạm: trả về tên tiêu chí vi phạm + trích dẫn CHÍNH XÁC từ/cụm từ vi phạm trong nội dung
