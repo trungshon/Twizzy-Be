@@ -79,12 +79,12 @@ bookmarksRouter.get(
  *   page: number
  * }
  */
-bookmarksRouter.get(
-  '/twizzs/:twizz_id/users',
-  twizzIdValidator,
-  paginationValidator,
-  isUserLoggedInValidator(accessTokenValidator),
-  wrapRequestHandler(getUsersWhoBookmarkedTwizzController)
-)
+// bookmarksRouter.get(
+//   '/twizzs/:twizz_id/users',
+//   twizzIdValidator,
+//   paginationValidator,
+//   isUserLoggedInValidator(accessTokenValidator),
+//   wrapRequestHandler(getUsersWhoBookmarkedTwizzController)
+// )
 
 export default bookmarksRouter

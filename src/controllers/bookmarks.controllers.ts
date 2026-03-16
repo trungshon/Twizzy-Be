@@ -56,24 +56,34 @@ export const getUsersWhoBookmarkedTwizzController = async (
   req: Request<{ twizz_id: string }, any, any, Pagination>,
   res: Response
 ) => {
-  const twizz_id = req.params.twizz_id
-  const viewer_user_id = req.decoded_authorization?.user_id
-  const limit = Number(req.query.limit)
-  const page = Number(req.query.page)
+  // const twizz_id = req.params.twizz_id
+  // const viewer_user_id = req.decoded_authorization?.user_id
+  // const limit = Number(req.query.limit)
+  // const page = Number(req.query.page)
 
-  const result = await bookmarksService.getUsersWhoBookmarkedTwizz({
-    twizz_id,
-    viewer_user_id,
-    limit,
-    page
-  })
+  // const result = await bookmarksService.getUsersWhoBookmarkedTwizz({
+  //   twizz_id,
+  //   viewer_user_id,
+  //   limit,
+  //   page
+  // })
+  // return res.json({
+  //   message: BOOKMARK_MESSAGES.BOOKMARK_TWIZZ_SUCCESSFULLY,
+  //   result: {
+  //     users: result.users,
+  //     limit,
+  //     page,
+  //     total_page: Math.ceil(result.total / limit)
+  //   }
+  // })
+
   return res.json({
-    message: BOOKMARK_MESSAGES.BOOKMARK_TWIZZ_SUCCESSFULLY,
+    message: 'Tính năng xem người đánh dấu đã tạm ẩn',
     result: {
-      users: result.users,
-      limit,
-      page,
-      total_page: Math.ceil(result.total / limit)
+      users: [],
+      limit: Number(req.query.limit) || 10,
+      page: Number(req.query.page) || 1,
+      total_page: 0
     }
   })
 }
