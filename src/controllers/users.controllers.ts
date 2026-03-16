@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import usersService from '~/services/users.services'
+import moderationService from '~/services/moderation.services'
 import { ParamsDictionary } from 'express-serve-static-core'
 import {
   FollowReqBody,
@@ -196,7 +197,59 @@ export const updateMeController = async (
 ) => {
   const { user_id } = req.decoded_authorization as TokenPayload
   const { body } = req
-  console.log(body)
+
+  // ========== Kiểm duyệt nội dung cập nhật hồ sơ ==========
+  const violations: any[] = []
+
+  // 1. Kiểm duyệt Ảnh đại diện
+  if (body.avatar) {
+    const avatarModeration = await moderationService.moderateImage(body.avatar)
+    if (!avatarModeration.passed) {
+      violations.push(...avatarModeration.violations.map((v) => ({ ...v, reason: `Ảnh đại diện: ${v.reason}` })))
+    }
+  }
+
+  // 2. Kiểm duyệt Ảnh bìa
+  if (body.cover_photo) {
+    const coverModeration = await moderationService.moderateImage(body.cover_photo)
+    if (!coverModeration.passed) {
+      violations.push(...coverModeration.violations.map((v) => ({ ...v, reason: `Ảnh bìa: ${v.reason}` })))
+    }
+  }
+
+  // 3. Kiểm duyệt Tên (Name)
+  if (body.name) {
+    const nameModeration = await moderationService.moderateText(body.name)
+    if (!nameModeration.passed) {
+      violations.push(...nameModeration.violations.map((v) => ({ ...v, reason: `Tên: ${v.reason}` })))
+    }
+  }
+
+  // 4. Kiểm duyệt Tiểu sử (Bio)
+  if (body.bio) {
+    const bioModeration = await moderationService.moderateText(body.bio)
+    if (!bioModeration.passed) {
+      violations.push(...bioModeration.violations.map((v) => ({ ...v, reason: `Tiểu sử: ${v.reason}` })))
+    }
+  }
+
+  // Nếu vi phạm bất kỳ tiêu chí nào → Block cập nhật
+  if (violations.length > 0) {
+    console.log('\n========== [Moderation] CẬP NHẬT HỒ SƠ BỊ TỪ CHỐI ==========')
+    console.log(`[Moderation] User ID: ${user_id}`)
+    violations.forEach((v, i) => {
+      console.log(`[Moderation] Vi phạm ${i + 1}: [${v.type}] ${v.reason}`)
+    })
+    console.log('=============================================================\n')
+
+    const violationReasons = violations.map((v) => v.reason).join('; ')
+
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      message: `Cập nhật hồ sơ vi phạm tiêu chuẩn cộng đồng: ${violationReasons}`,
+      violations
+    })
+  }
+
   const user = await usersService.updateMe(user_id, body)
   return res.json({
     message: USER_MESSAGES.UPDATE_ME_SUCCESSFULLY,
