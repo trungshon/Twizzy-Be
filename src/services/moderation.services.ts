@@ -1,5 +1,9 @@
 import vision from '@google-cloud/vision'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleAIFileManager } from '@google/generative-ai/server'
+import fs from 'fs'
+import path from 'path'
+import axios from 'axios'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 import { Media } from '~/models/Other'
 import { MediaType } from '~/constants/enum'
@@ -27,6 +31,7 @@ const visionClient = new vision.ImageAnnotatorClient({
 // ========== Khởi tạo Gemini Client ==========
 // Sử dụng API key để gọi Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
+const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY as string)
 
 class ModerationService {
   // ====================================================
@@ -64,8 +69,6 @@ Các tiêu chí vi phạm:
 
 QUY TẮC QUAN TRỌNG VỀ NGỮ CẢNH (BẮT BUỘC TUÂN THỦ):
 - Phải phân biệt được giữa LỜI CHỬI RỦA/TẤN CÔNG ÁC Ý thật sự với NHỮNG LỜI NÓI ĐÙA GIỠN, SLANG, TEENCODE thông thường của bạn bè.
-- TUYỆT ĐỐI BỎ QUA VÀ CHO PHÉP các câu chửi thề mang tính cảm thán, đùa cợt, gọi bạn bè thân thiết thân mật  NẾU CHÚNG KHÔNG ĐI KÈM HÀNH ĐỘNG ĐE DỌA THỰC SỰ HAY THÙ GHÉT MỘT ĐỐI TƯỢNG CỤ THỂ.
-- Chỉ phạt khi phát hiện chủ đích TẤN CÔNG, LĂNG MẠ, ĐE DỌA nhắm vào nạn nhân rõ ràng một cách độc hại.
 
 Quy tắc trả kết quả:
 - Nếu vi phạm: trả về tên tiêu chí vi phạm + trích dẫn CHÍNH XÁC từ/cụm từ vi phạm trong nội dung
@@ -226,100 +229,130 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
   }
 
   // ====================================================
-  // KIỂM DUYỆT VIDEO - Sử dụng Sightengine API
+  // KIỂM DUYỆT VIDEO - Sử dụng Gemini API
   // ====================================================
-  // Gửi URL video cho Sightengine → nhận kết quả kiểm duyệt
-  // Kiểm tra: nudity, violence, gore
   async moderateVideo(videoUrl: string): Promise<ModerationResult> {
+    const tempFilePath = path.join(__dirname, `temp_video_${Date.now()}.mp4`)
+    let uploadedFile: any = null
+
     try {
-      console.log(`[Moderation] Đang kiểm duyệt video: ${videoUrl}`)
+      console.log(`[Moderation] Đang tải video về server tạm: ${videoUrl}`)
 
-      // Gọi Sightengine API kiểm duyệt video qua URL (theo docs chính thức)
-      // Dùng axios + FormData để POST lên endpoint check-sync.json
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const FormData = require('form-data')
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const axios = require('axios')
-
-      const data = new FormData()
-      data.append('stream_url', videoUrl)
-      data.append('models', 'nudity-2.1,violence,gore')
-      data.append('api_user', process.env.SIGHTENGINE_USER as string)
-      data.append('api_secret', process.env.SIGHTENGINE_SECRET as string)
-
+      // BƯỚC 1: Tải video về thư mục tạm
       const response = await axios({
-        method: 'post',
-        url: 'https://api.sightengine.com/1.0/video/check-sync.json',
-        data,
-        headers: data.getHeaders(),
-        timeout: 90000 // Timeout 90s vì video cần thời gian xử lý
+        method: 'GET',
+        url: videoUrl,
+        responseType: 'stream'
       })
-      const result = response.data
-      console.log('[Moderation] Kết quả Sightengine:', JSON.stringify(result, null, 2))
 
-      const violations: ModerationViolation[] = []
+      const writer = fs.createWriteStream(tempFilePath)
+      response.data.pipe(writer)
 
-      // result.data.frames là mảng các frame snapshot của video
-      const frames: any[] = result?.data?.frames ?? []
+      await new Promise<void>((resolve, reject) => {
+        writer.on('finish', () => resolve())
+        writer.on('error', (err) => reject(err))
+      })
 
-      for (const frame of frames) {
-        // ---- Nudity 2.1: sexual_activity, sexual_display, erotica + very_suggestive ----
-        if (frame.nudity) {
-          const { sexual_activity = 0, sexual_display = 0, erotica = 0, very_suggestive = 0 } = frame.nudity
-          const isExplicit = sexual_activity > 0.7 || sexual_display > 0.7 || erotica > 0.75
+      console.log(`[Moderation] Upload video lên Gemini Files API...`)
 
-          // Nội dung khêu gợi
-          const isSuggestive = very_suggestive > 0.7
+      // BƯỚC 2: Upload lên Gemini Files API
+      const uploadResult = await fileManager.uploadFile(tempFilePath, {
+        mimeType: 'video/mp4'
+      })
+      uploadedFile = uploadResult.file // Lấy object file thật sự trả về từ upload
 
-          // Lấy bối cảnh (nếu API có hỗ trợ trả về)
-          const context = frame.nudity.context || {}
-          const isBeachOrPool = (context.sea_lake_pool || 0) > 0.5 || (context.outdoor_other || 0) > 0.7
+      let fileState = uploadedFile.state
+      let fileUri = uploadedFile.uri
+      const fileName = uploadedFile.name
+      const fileMimeType = uploadedFile.mimeType
 
-          if (isExplicit) {
-            if (!violations.some((v) => v.reason.includes('khiêu dâm'))) {
-              violations.push({ type: 'video', reason: 'Video chứa nội dung khiêu dâm hoặc khêu gợi quá mức' })
+      // BƯỚC 3: Đợi trạng thái PROCESSING kết thúc
+      while (fileState === 'PROCESSING') {
+        console.log('[Moderation] Video đang được xử lý bởi Gemini (PROCESSING)...')
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        const getFileResult = await fileManager.getFile(fileName)
+        fileState = getFileResult.state
+        fileUri = getFileResult.uri
+      }
+
+      if (fileState === 'FAILED') {
+        throw new Error('Gemini File processing failed')
+      }
+
+      console.log(`[Moderation] Video sẵn sàng. Bắt đầu phân tích bằng Gemini 2.5 Flash...`)
+
+      // BƯỚC 4: Phân tích bằng Gemini 2.5 Flash
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+
+      const prompt = `Bạn là một hệ thống kiểm duyệt nội dung mạng xã hội cho đối tượng người Việt Nam.
+Hãy phân tích video này có an toàn hay không.
+
+Các tiêu chí vi phạm nghiêm cấm:
+1. Nội dung bạo lực, máu me, kinh dị thực sự gây sợ hãi.
+2. Nội dung người lớn, khiêu dâm, lỏa thể, quan hệ tình dục.
+3. Kích động bạo động, lời nói thù ghét cực đoan.
+
+Trả về CHỈ JSON theo định dạng sau (không markdown, không giải thích):
+{
+  "is_violation": true/false,
+  "reason": "Tên tiêu chí vi phạm: \\"mô tả lỗi\\" (điền nếu vi phạm, trống nếu không)"
+}`
+
+      const result = await model.generateContent([
+        {
+          fileData: {
+            fileUri: fileUri,
+            mimeType: fileMimeType
+          }
+        },
+        prompt
+      ])
+
+      const text = result.response.text()
+      const cleanText = text
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim()
+
+      const analysis = JSON.parse(cleanText)
+
+      // Xóa file trên Gemini để tránh rác bộ nhớ
+      await fileManager.deleteFile(fileName)
+      uploadedFile = null
+
+      if (analysis.is_violation) {
+        console.log(`[Moderation] Video bị từ chối 🔥 → ${analysis.reason}`)
+        return {
+          passed: false,
+          violations: [
+            {
+              type: 'video',
+              reason: analysis.reason || 'Video chứa nội dung vi phạm tiêu chuẩn cộng đồng'
             }
-          } else if (isSuggestive) {
-            if (isBeachOrPool) {
-              // Hợp lệ nếu ở biển/hồ bơi
-              console.log(
-                `[Moderation] Bỏ qua lỗi KHÊU GỢI cho video vì phát hiện bối cảnh hợp lệ (sea_lake_pool: ${context.sea_lake_pool})`
-              )
-            } else {
-              if (!violations.some((v) => v.reason.includes('khêu gợi'))) {
-                violations.push({ type: 'video', reason: 'Video chứa nội dung khêu gợi không phù hợp ngữ cảnh' })
-              }
-            }
-          }
-        }
-
-        // ---- Violence ----
-        if ((frame.violence?.prob ?? 0) > 0.75) {
-          if (!violations.some((v) => v.reason.includes('bạo lực'))) {
-            violations.push({ type: 'video', reason: 'Video chứa nội dung bạo lực' })
-          }
-        }
-
-        // ---- Gore (máu me, kinh dị) ----
-        if ((frame.gore?.prob ?? 0) > 0.75) {
-          if (!violations.some((v) => v.reason.includes('kinh dị'))) {
-            violations.push({ type: 'video', reason: 'Video chứa nội dung máu me, kinh dị' })
-          }
+          ]
         }
       }
 
-      console.log(
-        `[Moderation] Video → ${violations.length === 0 ? 'Hợp lệ' : `Vi phạm: ${violations.map((v) => v.reason).join(', ')}`}`
-      )
-
-      return {
-        passed: violations.length === 0,
-        violations
-      }
-    } catch (error) {
-      // Nếu Sightengine API lỗi → cho qua (không block user)
-      console.error('[Moderation] Lỗi kiểm duyệt video:', error)
+      console.log('[Moderation] Video hợp lệ ✅')
       return { passed: true, violations: [] }
+    } catch (error: any) {
+      console.error('[Moderation] Lỗi kiểm duyệt video bằng Gemini:', error)
+
+      // Dọn dẹp file trên Gemini nếu bị kẹt lỗi
+      if (uploadedFile && uploadedFile.name) {
+        try {
+          await fileManager.deleteFile(uploadedFile.name)
+        } catch (e) {
+          // ignore error during cleanup
+        }
+      }
+
+      return { passed: true, violations: [] }
+    } finally {
+      // Dọn dẹp file tạm trên server local
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath)
+      }
     }
   }
 
