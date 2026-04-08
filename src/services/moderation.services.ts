@@ -234,8 +234,8 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
   // Nếu là URL Cloudinary, chèn các tham số nén để tải nhanh hơn và xử lý AI nhẹ hơn
   private _getOptimizedVideoUrl(videoUrl: string): string {
     if (videoUrl.includes('res.cloudinary.com') && videoUrl.includes('/video/upload/')) {
-      // w_480: Rộng 480px, vc_h264: codec h264, br_500k: nén xuống 500kbps
-      return videoUrl.replace('/video/upload/', '/video/upload/w_480,vc_h264,br_500k/')
+      // w_480: Rộng 480px, q_auto:eco: Nén thông minh mức tiết kiệm nhất, f_mp4: ép định dạng mp4
+      return videoUrl.replace('/video/upload/', '/video/upload/w_480,q_auto:eco,f_mp4/')
     }
     return videoUrl
   }
