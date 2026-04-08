@@ -229,6 +229,18 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
   }
 
   // ====================================================
+  // TRÌNH PHỤ TRỢ - Tối ưu hóa Video Cloudinary
+  // ====================================================
+  // Nếu là URL Cloudinary, chèn các tham số nén để tải nhanh hơn và xử lý AI nhẹ hơn
+  private _getOptimizedVideoUrl(videoUrl: string): string {
+    if (videoUrl.includes('res.cloudinary.com') && videoUrl.includes('/video/upload/')) {
+      // w_480: Rộng 480px, vc_h264: codec h264, br_500k: nén xuống 500kbps
+      return videoUrl.replace('/video/upload/', '/video/upload/w_480,vc_h264,br_500k/')
+    }
+    return videoUrl
+  }
+
+  // ====================================================
   // KIỂM DUYỆT VIDEO - Sử dụng Gemini API
   // ====================================================
   async moderateVideo(videoUrl: string): Promise<ModerationResult> {
@@ -236,12 +248,13 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
     let uploadedFile: any = null
 
     try {
-      console.log(`[Moderation] Đang tải video về server tạm: ${videoUrl}`)
+      const optimizedUrl = this._getOptimizedVideoUrl(videoUrl)
+      console.log(`[Moderation] Đang tải video về server tạm (đã tối ưu): ${optimizedUrl}`)
 
       // BƯỚC 1: Tải video về thư mục tạm
       const response = await axios({
         method: 'GET',
-        url: videoUrl,
+        url: optimizedUrl,
         responseType: 'stream'
       })
 
