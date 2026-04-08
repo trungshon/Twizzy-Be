@@ -46,8 +46,8 @@ class ModerationService {
     }
 
     try {
-      // Sử dụng model gemini-2.5-flash
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+      // Sử dụng model gemini-3.1-flash-lite-preview
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
 
       // Prompt yêu cầu Gemini phân tích nội dung
       // Trả về JSON chuẩn để dễ parse
@@ -292,10 +292,10 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
         throw new Error('Gemini File processing failed')
       }
 
-      console.log(`[Moderation] Video sẵn sàng. Bắt đầu phân tích bằng Gemini 2.5 Flash...`)
+      console.log(`[Moderation] Video sẵn sàng. Bắt đầu phân tích bằng Gemini 3.1 Flash Lite...`)
 
-      // BƯỚC 4: Phân tích bằng Gemini 2.5 Flash
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+      // BƯỚC 4: Phân tích bằng Gemini 3.1 Flash Lite
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
 
       const prompt = `Bạn là một hệ thống kiểm duyệt nội dung mạng xã hội cho đối tượng người Việt Nam.
 Hãy phân tích video này có an toàn hay không.
@@ -397,7 +397,7 @@ Trả về CHỈ JSON theo định dạng sau (không markdown, không giải th
       console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt IMAGE (bị tắt trong .env)')
     }
 
-    // 3. Kiểm duyệt từng video bằng Sightengine (nếu được bật)
+    // 3. Kiểm duyệt từng video (nếu được bật)
     const isVideoModerationEnabled = process.env.MODERATE_VIDEO !== 'false'
     if (isVideoModerationEnabled) {
       const videoMedias = medias.filter((m) => m.type === MediaType.Video)
