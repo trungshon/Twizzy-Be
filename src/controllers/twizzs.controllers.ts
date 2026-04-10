@@ -13,9 +13,11 @@ export const createTwizzController = async (req: Request<ParamsDictionary, any, 
 
   // ========== Kiểm duyệt nội dung trước khi đăng ==========
   // Chạy song song: kiểm duyệt văn bản (Gemini) + ảnh (Vision)
+  // TỐI ƯU: Nếu có moderation_signature hợp lệ thì sẽ skip gọi Gemini duyệt lại text
   const moderation = await moderationService.moderateContent({
     content: req.body.content,
-    medias: req.body.medias
+    medias: req.body.medias,
+    textSignature: (req.body as any).moderation_signature
   })
 
   // Nếu vi phạm → log chi tiết + từ chối đăng bài

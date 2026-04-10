@@ -4,6 +4,7 @@ import Twizz from '~/models/schemas/Twizz.schema'
 import { ObjectId, WithId } from 'mongodb'
 import Hashtag from '~/models/schemas/Hashtag.schema'
 import { NotificationType, TwizzAudience, TwizzType } from '~/constants/enum'
+import mediaService from './medias.services'
 import notificationsService from './notifications.services'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { ErrorWithStatus } from '~/models/Errors'
@@ -2023,8 +2024,21 @@ class TwizzsService {
       }
     }
 
+    // Lấy thông tin các bài viết để xóa media trên Cloudinary
+    const twizzsToDelete = await databaseService.twizzs
+      .find({ _id: { $in: allIdsToDelete } })
+      .toArray()
+
+    const urlsToDelete: string[] = []
+    twizzsToDelete.forEach((twizz) => {
+      if (twizz.medias && Array.isArray(twizz.medias)) {
+        twizz.medias.forEach((m: any) => urlsToDelete.push(m.url))
+      }
+    })
+
     // Delete the twizzs and associated data (likes, bookmarks)
     await Promise.all([
+      ...urlsToDelete.map((url) => mediaService.deleteMedia(url)),
       databaseService.twizzs.deleteMany({
         _id: { $in: allIdsToDelete }
       }),

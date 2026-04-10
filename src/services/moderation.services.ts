@@ -7,6 +7,7 @@ import axios from 'axios'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 import { Media } from '~/models/Other'
 import { MediaType } from '~/constants/enum'
+import crypto from 'crypto'
 
 // ========== Kết quả kiểm duyệt ==========
 
@@ -32,6 +33,7 @@ const visionClient = new vision.ImageAnnotatorClient({
 // Sử dụng API key để gọi Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
 const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY as string)
+const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
 
 class ModerationService {
   // ====================================================
@@ -40,15 +42,16 @@ class ModerationService {
   // Gửi nội dung cho Gemini phân tích và trả về kết quả
   // Gemini sẽ đánh giá: thù ghét, bạo lực, tình dục, quấy rối, tự gây hại
   async moderateText(content: string): Promise<ModerationResult> {
-    // Bỏ qua nếu nội dung trống
-    if (!content || content.trim() === '') {
+    // Bỏ qua nếu nội dung trống hoặc bị tắt trong .env
+    const isTextModerationEnabled = process.env.MODERATE_TEXT !== 'false'
+    if (!content || content.trim() === '' || !isTextModerationEnabled) {
+      if (!isTextModerationEnabled && content) {
+        console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt TEXT (bị tắt trong .env)')
+      }
       return { passed: true, violations: [] }
     }
 
     try {
-      // Sử dụng model gemini-3.1-flash-lite-preview
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
-
       // Prompt yêu cầu Gemini phân tích nội dung
       // Trả về JSON chuẩn để dễ parse
       const prompt = `Bạn là một hệ thống kiểm duyệt nội dung mạng xã hội thông minh và thấu hiểu ngữ cảnh cho người dùng Việt Nam.
@@ -85,6 +88,21 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
       // Gọi Gemini API
       const result = await model.generateContent(prompt)
       const response = result.response
+
+      // KIỂM TRA: Nếu bị Google chặn do nội dung quá nhạy cảm
+      if (response.promptFeedback?.blockReason) {
+        console.log(`[Moderation] TEXT BỊ GOOGLE CHẶN: ${response.promptFeedback.blockReason}`)
+        return {
+          passed: false,
+          violations: [
+            {
+              type: 'text',
+              reason: 'Nội dung bị hệ thống bảo mật từ chối do vi phạm chính sách cấp độ nặng.'
+            }
+          ]
+        }
+      }
+
       const text = response.text()
 
       // Parse JSON kết quả từ Gemini
@@ -112,26 +130,79 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
       // Không vi phạm
       console.log(`[Moderation] Text hợp lệ: "${content.substring(0, 80)}..."`)
       return { passed: true, violations: [] }
-    } catch (error) {
-      // Nếu Gemini API lỗi → cho qua (không block user)
+    } catch (error: any) {
+      // Nếu là lỗi bị chặn nội dung (PROHIBITED_CONTENT) thì trả về vi phạm
+      if (error.message?.includes('PROHIBITED_CONTENT') || error.message?.includes('Text not available')) {
+        return {
+          passed: false,
+          violations: [{ type: 'text', reason: 'Nội dung bị hệ thống bảo mật từ chối.' }]
+        }
+      }
+
+      // Nếu Gemini API lỗi khác → cho qua (không block user)
       // Log lỗi để debug nhưng không reject bài viết
       console.error('[Moderation] Lỗi kiểm duyệt văn bản:', error)
       return { passed: true, violations: [] }
     }
   }
 
+  // Kiếm tra URL có phải là tài nguyên nội bộ đã qua kiểm duyệt lúc upload không
+  private isTrustedUrl(url: string): boolean {
+    // Nếu chứa domain Cloudinary của mình và nằm trong folder 'twizzy'
+    // vì folder này chỉ có bện mình mới có quyền upload lên sau khi đã moderate local.
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+    return (
+      url.includes('res.cloudinary.com') &&
+      url.includes(`/${cloudName}/`) &&
+      (url.includes('/twizzy/images/') || url.includes('/twizzy/videos/'))
+    )
+  }
+
+
+  // ====================================================
+  // TRÌNH PHỤ TRỢ - Chữ ký xác thực (Signed Proof)
+  // ====================================================
+  // Tạo chữ ký dựa trên nội dung đã được duyệt
+  generateTextSignature(content: string): string {
+    const secret = process.env.PASSWORD_SECRET || 'default-moderation-secret'
+    return crypto.createHmac('sha256', secret).update(content).digest('hex')
+  }
+
+  // Xác minh chữ ký có khớp với nội dung không
+  verifyTextSignature(content: string, signature: string): boolean {
+    const expectedSignature = this.generateTextSignature(content)
+    return signature === expectedSignature
+  }
+
+
   // ====================================================
   // KIỂM DUYỆT ẢNH - Sử dụng Google Cloud Vision API
   // ====================================================
   // Gửi URL ảnh cho Vision API → nhận kết quả SafeSearch
   // SafeSearch phát hiện: adult, violence, racy, spoof, medical
-  async moderateImage(imageUrl: string): Promise<ModerationResult> {
+  // Gửi URL ảnh cho Vision API → nhận kết quả SafeSearch
+  async moderateImage(imageUrlOrPath: string): Promise<ModerationResult> {
+    const isImageModerationEnabled = process.env.MODERATE_IMAGE !== 'false'
+    if (!isImageModerationEnabled) {
+      console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt IMAGE (bị tắt trong .env)')
+      return { passed: true, violations: [] }
+    }
+
     try {
+      const isLocalPath = !imageUrlOrPath.startsWith('http')
+
       // BƯỚC 1: Chỉ gọi Vision API lấy SafeSearch Detection để tiết kiệm chi phí
-      const [result] = await visionClient.annotateImage({
-        image: { source: { imageUri: imageUrl } },
+      const annotateRequest: any = {
         features: [{ type: 'SAFE_SEARCH_DETECTION' }]
-      })
+      }
+
+      if (isLocalPath) {
+        annotateRequest.image = { content: fs.readFileSync(imageUrlOrPath) }
+      } else {
+        annotateRequest.image = { source: { imageUri: imageUrlOrPath } }
+      }
+
+      const [result] = await visionClient.annotateImage(annotateRequest)
 
       const safeSearch = result.safeSearchAnnotation
       console.log('[Moderation] Kết quả Vision API (SafeSearch):', JSON.stringify(safeSearch, null, 2))
@@ -168,10 +239,17 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
       if (safeSearch.racy === 'VERY_LIKELY') {
         console.log('[Moderation] Ảnh bị đánh dấu RACY, tiến hành gọi thêm LABEL_DETECTION để xem xét bối cảnh...')
 
-        const [labelResult] = await visionClient.annotateImage({
-          image: { source: { imageUri: imageUrl } },
+        const labelRequest: any = {
           features: [{ type: 'LABEL_DETECTION' }]
-        })
+        }
+
+        if (isLocalPath) {
+          labelRequest.image = { content: fs.readFileSync(imageUrlOrPath) }
+        } else {
+          labelRequest.image = { source: { imageUri: imageUrlOrPath } }
+        }
+
+        const [labelResult] = await visionClient.annotateImage(labelRequest)
 
         const labels = labelResult.labelAnnotations || []
         console.log('[Moderation] Kết quả Vision API (Labels - Fallback):', labels.map((l) => l.description).join(', '))
@@ -243,28 +321,41 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
   // ====================================================
   // KIỂM DUYỆT VIDEO - Sử dụng Gemini API
   // ====================================================
-  async moderateVideo(videoUrl: string): Promise<ModerationResult> {
-    const tempFilePath = path.join(__dirname, `temp_video_${Date.now()}.mp4`)
+  async moderateVideo(videoUrlOrPath: string): Promise<ModerationResult> {
+    const isVideoModerationEnabled = process.env.MODERATE_VIDEO !== 'false'
+    if (!isVideoModerationEnabled) {
+      console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt VIDEO (bị tắt trong .env)')
+      return { passed: true, violations: [] }
+    }
+
+    const isLocalPath = !videoUrlOrPath.startsWith('http')
+    let tempFilePath = ''
     let uploadedFile: any = null
 
     try {
-      const optimizedUrl = this._getOptimizedVideoUrl(videoUrl)
-      console.log(`[Moderation] Đang tải video về server tạm (đã tối ưu): ${optimizedUrl}`)
+      if (isLocalPath) {
+        tempFilePath = videoUrlOrPath
+        console.log(`[Moderation] Đang kiểm duyệt video cục bộ: ${tempFilePath}`)
+      } else {
+        tempFilePath = path.join(__dirname, `temp_video_${Date.now()}.mp4`)
+        const optimizedUrl = this._getOptimizedVideoUrl(videoUrlOrPath)
+        console.log(`[Moderation] Đang tải video về server tạm (đã tối ưu): ${optimizedUrl}`)
 
-      // BƯỚC 1: Tải video về thư mục tạm
-      const response = await axios({
-        method: 'GET',
-        url: optimizedUrl,
-        responseType: 'stream'
-      })
+        // BƯỚC 1: Tải video về thư mục tạm
+        const response = await axios({
+          method: 'GET',
+          url: optimizedUrl,
+          responseType: 'stream'
+        })
 
-      const writer = fs.createWriteStream(tempFilePath)
-      response.data.pipe(writer)
+        const writer = fs.createWriteStream(tempFilePath)
+        response.data.pipe(writer)
 
-      await new Promise<void>((resolve, reject) => {
-        writer.on('finish', () => resolve())
-        writer.on('error', (err) => reject(err))
-      })
+        await new Promise<void>((resolve, reject) => {
+          writer.on('finish', () => resolve())
+          writer.on('error', (err) => reject(err))
+        })
+      }
 
       console.log(`[Moderation] Upload video lên Gemini Files API...`)
 
@@ -292,10 +383,9 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
         throw new Error('Gemini File processing failed')
       }
 
-      console.log(`[Moderation] Video sẵn sàng. Bắt đầu phân tích bằng Gemini 3.1 Flash Lite...`)
+      console.log(`[Moderation] Video sẵn sàng. Bắt đầu phân tích bằng Gemini...`)
 
-      // BƯỚC 4: Phân tích bằng Gemini 3.1 Flash Lite
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
+      // BƯỚC 4: Phân tích bằng Gemini
 
       const prompt = `Bạn là một hệ thống kiểm duyệt nội dung mạng xã hội cho đối tượng người Việt Nam.
 Hãy phân tích video này có an toàn hay không.
@@ -311,17 +401,33 @@ Trả về CHỈ JSON theo định dạng sau (không markdown, không giải th
   "reason": "Tên tiêu chí vi phạm: \\"mô tả lỗi\\" (điền nếu vi phạm, trống nếu không)"
 }`
 
+      // BƯỚC 5: Gọi Gemini API
       const result = await model.generateContent([
         {
           fileData: {
-            fileUri: fileUri,
-            mimeType: fileMimeType
+            mimeType: fileMimeType,
+            fileUri: fileUri
           }
         },
-        prompt
+        { text: prompt }
       ])
+      const response = result.response
 
-      const text = result.response.text()
+      // KIỂM TRA: Nếu bị Google chặn do video quá nhạy cảm
+      if (response.promptFeedback?.blockReason) {
+        console.log(`[Moderation] VIDEO BỊ GOOGLE CHẶN: ${response.promptFeedback.blockReason}`)
+        return {
+          passed: false,
+          violations: [
+            {
+              type: 'video',
+              reason: 'Video bị hệ thống bảo mật từ chối do vi phạm chính sách cấp độ nặng.'
+            }
+          ]
+        }
+      }
+
+      const text = response.text()
       const cleanText = text
         .replace(/```json\n?/g, '')
         .replace(/```\n?/g, '')
@@ -349,6 +455,15 @@ Trả về CHỈ JSON theo định dạng sau (không markdown, không giải th
       console.log('[Moderation] Video hợp lệ ✅')
       return { passed: true, violations: [] }
     } catch (error: any) {
+      // Nếu là lỗi bị chặn nội dung (PROHIBITED_CONTENT) hoặc không lấy được text do block
+      if (error.message?.includes('PROHIBITED_CONTENT') || error.message?.includes('Text not available')) {
+        console.log('[Moderation] VIDEO BỊ CHẶN (Catch):', error.message)
+        return {
+          passed: false,
+          violations: [{ type: 'video', reason: 'Video bị hệ thống bảo mật từ chối do nội dung nhạy cảm.' }]
+        }
+      }
+
       console.error('[Moderation] Lỗi kiểm duyệt video bằng Gemini:', error)
 
       // Dọn dẹp file trên Gemini nếu bị kẹt lỗi
@@ -362,8 +477,8 @@ Trả về CHỈ JSON theo định dạng sau (không markdown, không giải th
 
       return { passed: true, violations: [] }
     } finally {
-      // Dọn dẹp file tạm trên server local
-      if (fs.existsSync(tempFilePath)) {
+      // Dọn dẹp file tạm trên server local (chỉ xóa nếu là file tải từ Internet về)
+      if (!isLocalPath && fs.existsSync(tempFilePath)) {
         fs.unlinkSync(tempFilePath)
       }
     }
@@ -374,14 +489,27 @@ Trả về CHỈ JSON theo định dạng sau (không markdown, không giải th
   // ====================================================
   // Chạy song song tất cả kiểm duyệt bằng Promise.all
   // Nếu BẤT KỲ phần nào vi phạm → reject toàn bộ bài viết
-  async moderateContent({ content, medias }: { content: string; medias: Media[] }): Promise<ModerationResult> {
+  async moderateContent({
+    content,
+    medias,
+    textSignature
+  }: {
+    content: string
+    medias: Media[]
+    textSignature?: string
+  }): Promise<ModerationResult> {
     // Tạo danh sách các promise kiểm duyệt
     const moderationTasks: Promise<ModerationResult>[] = []
 
     // 1. Kiểm duyệt văn bản (nếu có nội dung và được bật)
     const isTextModerationEnabled = process.env.MODERATE_TEXT !== 'false'
     if (isTextModerationEnabled && content && content.trim() !== '') {
-      moderationTasks.push(this.moderateText(content))
+      // TỐI ƯU: Nếu có chữ ký hợp lệ thì bỏ qua duyệt Gemini lần 2
+      if (textSignature && this.verifyTextSignature(content, textSignature)) {
+        console.log('[Moderation] 🛡️ Skip TEXT moderation (Valid Signed Proof detected)')
+      } else {
+        moderationTasks.push(this.moderateText(content))
+      }
     } else if (!isTextModerationEnabled) {
       console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt TEXT (bị tắt trong .env)')
     }
@@ -391,7 +519,12 @@ Trả về CHỈ JSON theo định dạng sau (không markdown, không giải th
     if (isImageModerationEnabled) {
       const imageMedias = medias.filter((m) => m.type === MediaType.Image)
       for (const media of imageMedias) {
-        moderationTasks.push(this.moderateImage(media.url))
+        // Chỉ kiểm duyệt nếu không phải URL tin cậy (đã moderate lúc upload)
+        if (!this.isTrustedUrl(media.url)) {
+          moderationTasks.push(this.moderateImage(media.url))
+        } else {
+          console.log(`[Moderation] 🛡️ Skip IMAGE moderation (Trusted internal URL): ${media.url.substring(0, 60)}...`)
+        }
       }
     } else {
       console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt IMAGE (bị tắt trong .env)')
@@ -402,7 +535,12 @@ Trả về CHỈ JSON theo định dạng sau (không markdown, không giải th
     if (isVideoModerationEnabled) {
       const videoMedias = medias.filter((m) => m.type === MediaType.Video)
       for (const media of videoMedias) {
-        moderationTasks.push(this.moderateVideo(media.url))
+        // Chỉ kiểm duyệt nếu không phải URL tin cậy (đã moderate lúc upload)
+        if (!this.isTrustedUrl(media.url)) {
+          moderationTasks.push(this.moderateVideo(media.url))
+        } else {
+          console.log(`[Moderation] 🛡️ Skip VIDEO moderation (Trusted internal URL): ${media.url.substring(0, 60)}...`)
+        }
       }
     } else {
       console.log('[Moderation] ⏩ Bỏ qua kiểm duyệt VIDEO (bị tắt trong .env)')

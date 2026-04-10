@@ -4,6 +4,7 @@ import { RegisterReqBody, UpdateMeReqBody } from '~/models/requests/User.request
 import { hashPassword } from '~/utils/crypto'
 import { signToken, verifyToken } from '~/utils/jwt'
 import { NotificationType, TokenType, UserRole, UserVerifyStatus } from '~/constants/enum'
+import mediaService from './medias.services'
 import notificationsService from './notifications.services'
 import RefreshToken from '~/models/schemas/RefreshToken.schema'
 import { ObjectId } from 'mongodb'
@@ -570,6 +571,8 @@ class UsersService {
       userUpdate.twizz_circle = payload.twizz_circle.map((id) => new ObjectId(id))
     }
 
+    const oldUser = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+
     const user = await databaseService.users.findOneAndUpdate(
       { _id: new ObjectId(user_id) },
       {
@@ -589,6 +592,16 @@ class UsersService {
         }
       }
     )
+
+    // Nếu cập nhật thành công và có thay đổi avatar/cover_photo -> xóa file cũ trên Cloudinary
+    if (user) {
+      if (payload.avatar && oldUser?.avatar && oldUser.avatar !== payload.avatar) {
+        mediaService.deleteMedia(oldUser.avatar)
+      }
+      if (payload.cover_photo && oldUser?.cover_photo && oldUser.cover_photo !== payload.cover_photo) {
+        mediaService.deleteMedia(oldUser.cover_photo)
+      }
+    }
 
     if (!user) return null
 

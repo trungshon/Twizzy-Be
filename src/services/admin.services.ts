@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb'
 import databaseService from './database.services'
 import { UserVerifyStatus } from '~/constants/enum'
+import mediaService from './medias.services'
 
 class AdminService {
     // Dashboard Statistics
@@ -200,8 +201,26 @@ class AdminService {
     async deleteUser(user_id: string) {
         const objectId = new ObjectId(user_id)
 
-        // Delete user's twizzs, likes, bookmarks, followers, following
+        // Lấy thông tin user và các twizz của user để xóa media trên Cloudinary
+        const [user, userTwizzs] = await Promise.all([
+            databaseService.users.findOne({ _id: objectId }),
+            databaseService.twizzs.find({ user_id: objectId }).toArray()
+        ])
+
+        // Thu thập tất cả URL cần xóa
+        const urlsToDelete: string[] = []
+        if (user?.avatar) urlsToDelete.push(user.avatar)
+        if (user?.cover_photo) urlsToDelete.push(user.cover_photo)
+
+        userTwizzs.forEach(twizz => {
+            if (twizz.medias && Array.isArray(twizz.medias)) {
+                twizz.medias.forEach((m: any) => urlsToDelete.push(m.url))
+            }
+        })
+
+        // Xóa song song trên Cloudinary và xóa DB
         await Promise.all([
+            ...urlsToDelete.map(url => mediaService.deleteMedia(url)),
             databaseService.users.deleteOne({ _id: objectId }),
             databaseService.twizzs.deleteMany({ user_id: objectId }),
             databaseService.likes.deleteMany({ user_id: objectId }),
@@ -351,8 +370,21 @@ class AdminService {
             }
         }
 
+        // Lấy thông tin các bài viết để xóa media trên Cloudinary
+        const twizzsToDelete = await databaseService.twizzs
+            .find({ _id: { $in: allIdsToDelete } })
+            .toArray()
+
+        const urlsToDelete: string[] = []
+        twizzsToDelete.forEach(twizz => {
+            if (twizz.medias && Array.isArray(twizz.medias)) {
+                twizz.medias.forEach((m: any) => urlsToDelete.push(m.url))
+            }
+        })
+
         // Delete twizzs and related data
         await Promise.all([
+            ...urlsToDelete.map(url => mediaService.deleteMedia(url)),
             databaseService.twizzs.deleteMany({ _id: { $in: allIdsToDelete } }),
             databaseService.likes.deleteMany({ twizz_id: { $in: allIdsToDelete } }),
             databaseService.bookmarks.deleteMany({ twizz_id: { $in: allIdsToDelete } })
