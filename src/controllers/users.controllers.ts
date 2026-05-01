@@ -217,19 +217,23 @@ export const updateMeController = async (
     }
   }
 
-  // 3. Kiểm duyệt Tên (Name)
+  // 3-4. Kiểm duyệt Tên (Name) và Tiểu sử (Bio) song song để giảm latency
+  const textModerationTasks: Promise<{ field: 'name' | 'bio'; result: any }>[] = []
   if (body.name) {
-    const nameModeration = await moderationService.moderateText(body.name)
-    if (!nameModeration.passed) {
-      violations.push(...nameModeration.violations.map((v) => ({ ...v, reason: `Tên: ${v.reason}` })))
-    }
+    textModerationTasks.push(
+      moderationService.moderateText(body.name).then((result) => ({ field: 'name' as const, result }))
+    )
   }
-
-  // 4. Kiểm duyệt Tiểu sử (Bio)
   if (body.bio) {
-    const bioModeration = await moderationService.moderateText(body.bio)
-    if (!bioModeration.passed) {
-      violations.push(...bioModeration.violations.map((v) => ({ ...v, reason: `Tiểu sử: ${v.reason}` })))
+    textModerationTasks.push(
+      moderationService.moderateText(body.bio).then((result) => ({ field: 'bio' as const, result }))
+    )
+  }
+  const textModerationResults = await Promise.all(textModerationTasks)
+  for (const { field, result } of textModerationResults) {
+    if (!result.passed) {
+      const prefix = field === 'name' ? 'Tên' : 'Tiểu sử'
+      violations.push(...result.violations.map((v: any) => ({ ...v, reason: `${prefix}: ${v.reason}` })))
     }
   }
 

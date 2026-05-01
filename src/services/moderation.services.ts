@@ -33,7 +33,7 @@ const visionClient = new vision.ImageAnnotatorClient({
 // Sử dụng API key để gọi Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
 const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY as string)
-const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
 class ModerationService {
   // ====================================================
