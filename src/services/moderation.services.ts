@@ -4,7 +4,6 @@ import { GoogleAIFileManager } from '@google/generative-ai/server'
 import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 import { Media } from '~/models/Other'
 import { MediaType } from '~/constants/enum'
 import crypto from 'crypto'
@@ -52,6 +51,7 @@ class ModerationService {
     }
 
     try {
+      console.log(`[Moderation] ▶️ Bắt đầu duyệt TEXT: "${content.substring(0, 80)}..." (len=${content.length})`)
       // Prompt yêu cầu Gemini phân tích nội dung
       // Trả về JSON chuẩn để dễ parse
       const prompt = `Bạn là một hệ thống kiểm duyệt nội dung mạng xã hội thông minh và thấu hiểu ngữ cảnh cho người dùng Việt Nam.
@@ -158,7 +158,6 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
     )
   }
 
-
   // ====================================================
   // TRÌNH PHỤ TRỢ - Chữ ký xác thực (Signed Proof)
   // ====================================================
@@ -173,7 +172,6 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
     const expectedSignature = this.generateTextSignature(content)
     return signature === expectedSignature
   }
-
 
   // ====================================================
   // KIỂM DUYỆT ẢNH - Sử dụng Google Cloud Vision API

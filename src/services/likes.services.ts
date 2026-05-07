@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb'
 import Like from '~/models/schemas/Like.schema'
 import { NotificationType, TwizzType } from '~/constants/enum'
 import notificationsService from './notifications.services'
+import recommendationService from './recommendations.services'
 
 class LikesService {
   async likeTwizz(user_id: string, twizz_id: string) {
@@ -11,6 +12,9 @@ class LikesService {
       { $setOnInsert: new Like({ user_id: new ObjectId(user_id), twizz_id: new ObjectId(twizz_id) }) },
       { upsert: true, returnDocument: 'after' }
     )
+
+    // Xóa cache gợi ý của user vì hành vi tương tác đã thay đổi
+    recommendationService.invalidateUserCache(user_id)
 
     // Trigger notification
     if (result) {
@@ -33,6 +37,10 @@ class LikesService {
       user_id: new ObjectId(user_id),
       twizz_id: new ObjectId(twizz_id)
     })
+
+    // Xóa cache gợi ý của user vì hành vi tương tác đã thay đổi
+    recommendationService.invalidateUserCache(user_id)
+
     return result
   }
 
@@ -255,37 +263,37 @@ class LikesService {
                 },
                 ...(viewer_user_id_objectId
                   ? [
-                    {
-                      $lookup: {
-                        from: 'likes',
-                        localField: '_id',
-                        foreignField: 'twizz_id',
-                        as: 'user_likes',
-                        pipeline: [
-                          {
-                            $match: {
-                              user_id: viewer_user_id_objectId
+                      {
+                        $lookup: {
+                          from: 'likes',
+                          localField: '_id',
+                          foreignField: 'twizz_id',
+                          as: 'user_likes',
+                          pipeline: [
+                            {
+                              $match: {
+                                user_id: viewer_user_id_objectId
+                              }
                             }
-                          }
-                        ]
-                      }
-                    },
-                    {
-                      $lookup: {
-                        from: 'bookmarks',
-                        localField: '_id',
-                        foreignField: 'twizz_id',
-                        as: 'user_bookmarks',
-                        pipeline: [
-                          {
-                            $match: {
-                              user_id: viewer_user_id_objectId
+                          ]
+                        }
+                      },
+                      {
+                        $lookup: {
+                          from: 'bookmarks',
+                          localField: '_id',
+                          foreignField: 'twizz_id',
+                          as: 'user_bookmarks',
+                          pipeline: [
+                            {
+                              $match: {
+                                user_id: viewer_user_id_objectId
+                              }
                             }
-                          }
-                        ]
+                          ]
+                        }
                       }
-                    }
-                  ]
+                    ]
                   : []),
                 {
                   $addFields: {
@@ -347,12 +355,12 @@ class LikesService {
               as: 'user_likes',
               pipeline: viewer_user_id_objectId
                 ? [
-                  {
-                    $match: {
-                      user_id: viewer_user_id_objectId
+                    {
+                      $match: {
+                        user_id: viewer_user_id_objectId
+                      }
                     }
-                  }
-                ]
+                  ]
                 : []
             }
           },
@@ -364,12 +372,12 @@ class LikesService {
               as: 'user_bookmarks',
               pipeline: viewer_user_id_objectId
                 ? [
-                  {
-                    $match: {
-                      user_id: viewer_user_id_objectId
+                    {
+                      $match: {
+                        user_id: viewer_user_id_objectId
+                      }
                     }
-                  }
-                ]
+                  ]
                 : []
             }
           },
@@ -490,31 +498,31 @@ class LikesService {
           },
           ...(viewer_user_id_objectId
             ? [
-              {
-                $lookup: {
-                  from: 'followers',
-                  let: { user_id: '$_id' },
-                  pipeline: [
-                    {
-                      $match: {
-                        $expr: {
-                          $and: [
-                            { $eq: ['$followed_user_id', '$$user_id'] },
-                            { $eq: ['$user_id', viewer_user_id_objectId] }
-                          ]
+                {
+                  $lookup: {
+                    from: 'followers',
+                    let: { user_id: '$_id' },
+                    pipeline: [
+                      {
+                        $match: {
+                          $expr: {
+                            $and: [
+                              { $eq: ['$followed_user_id', '$$user_id'] },
+                              { $eq: ['$user_id', viewer_user_id_objectId] }
+                            ]
+                          }
                         }
                       }
-                    }
-                  ],
-                  as: 'is_following_check'
+                    ],
+                    as: 'is_following_check'
+                  }
+                },
+                {
+                  $addFields: {
+                    is_following: { $gt: [{ $size: '$is_following_check' }, 0] }
+                  }
                 }
-              },
-              {
-                $addFields: {
-                  is_following: { $gt: [{ $size: '$is_following_check' }, 0] }
-                }
-              }
-            ]
+              ]
             : []),
           {
             $project: {

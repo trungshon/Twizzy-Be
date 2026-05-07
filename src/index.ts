@@ -21,6 +21,7 @@ import conversationsRouter from './routes/conversations.routes'
 import initSocket from './utils/socket'
 import reportsRouter from './routes/reports.routes'
 import moderationRouter from './routes/moderation.routes'
+import recommendationsRouter from './routes/recommendations.routes'
 
 // import './utils/fake'
 
@@ -50,6 +51,7 @@ app.use('/notifications', notificationsRouter)
 app.use('/admin', adminRouter)
 app.use('/reports', reportsRouter)
 app.use('/moderation', moderationRouter)
+app.use('/recommendations', recommendationsRouter)
 
 // Serve admin web static files
 app.use('/admin-web', express.static(path.join(__dirname, '../admin')))

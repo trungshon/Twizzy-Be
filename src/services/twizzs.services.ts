@@ -9,6 +9,7 @@ import notificationsService from './notifications.services'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { ErrorWithStatus } from '~/models/Errors'
 import { TWIZZ_MESSAGES } from '~/constants/messages'
+import recommendationService from './recommendations.services'
 
 class TwizzsService {
   async checkAndCreateHashtags(hashtags: string[]) {
@@ -25,8 +26,6 @@ class TwizzsService {
     return hashtagDocuments.map((hashtag) => (hashtag as WithId<Hashtag>)._id)
   }
   async createTwizz(user_id: string, body: TwizzReqBody) {
-
-
     const hashtags = await this.checkAndCreateHashtags(body.hashtags)
     const result = await databaseService.twizzs.insertOne(
       new Twizz({
@@ -343,15 +342,24 @@ class TwizzsService {
       .toArray()
     const finalResult = twizzs[0]
 
+    // Xóa cache gợi ý của user khi họ tạo comment hoặc quote (tương tác mới ảnh hưởng đến profile)
+    if (finalResult.type === TwizzType.Comment || finalResult.type === TwizzType.QuoteTwizz) {
+      recommendationService.invalidateUserCache(user_id)
+    }
+
     // Trigger notification for Comment or QuoteTwizz
-    if (finalResult.parent_id && (finalResult.type === TwizzType.Comment || finalResult.type === TwizzType.QuoteTwizz)) {
+    if (
+      finalResult.parent_id &&
+      (finalResult.type === TwizzType.Comment || finalResult.type === TwizzType.QuoteTwizz)
+    ) {
       const parentTwizz = await databaseService.twizzs.findOne({ _id: finalResult.parent_id })
       if (parentTwizz && parentTwizz.user_id.toString() !== user_id) {
         await notificationsService.createNotification({
           user_id: parentTwizz.user_id.toString(),
           sender_id: user_id,
           type: finalResult.type === TwizzType.Comment ? NotificationType.Comment : NotificationType.QuoteTwizz,
-          twizz_id: finalResult.type === TwizzType.Comment ? finalResult.parent_id.toString() : finalResult._id.toString()
+          twizz_id:
+            finalResult.type === TwizzType.Comment ? finalResult.parent_id.toString() : finalResult._id.toString()
         })
       }
     }
@@ -723,10 +731,7 @@ class TwizzsService {
                     {
                       $match: {
                         $expr: {
-                          $and: [
-                            { $eq: ['$user_id', user_id_objectId] },
-                            { $eq: ['$followed_user_id', '$$author_id'] }
-                          ]
+                          $and: [{ $eq: ['$user_id', user_id_objectId] }, { $eq: ['$followed_user_id', '$$author_id'] }]
                         }
                       }
                     }
@@ -1796,37 +1801,37 @@ class TwizzsService {
                 },
                 ...(viewer_user_id_objectId
                   ? [
-                    {
-                      $lookup: {
-                        from: 'likes',
-                        localField: '_id',
-                        foreignField: 'twizz_id',
-                        as: 'user_likes',
-                        pipeline: [
-                          {
-                            $match: {
-                              user_id: viewer_user_id_objectId
+                      {
+                        $lookup: {
+                          from: 'likes',
+                          localField: '_id',
+                          foreignField: 'twizz_id',
+                          as: 'user_likes',
+                          pipeline: [
+                            {
+                              $match: {
+                                user_id: viewer_user_id_objectId
+                              }
                             }
-                          }
-                        ]
-                      }
-                    },
-                    {
-                      $lookup: {
-                        from: 'bookmarks',
-                        localField: '_id',
-                        foreignField: 'twizz_id',
-                        as: 'user_bookmarks',
-                        pipeline: [
-                          {
-                            $match: {
-                              user_id: viewer_user_id_objectId
+                          ]
+                        }
+                      },
+                      {
+                        $lookup: {
+                          from: 'bookmarks',
+                          localField: '_id',
+                          foreignField: 'twizz_id',
+                          as: 'user_bookmarks',
+                          pipeline: [
+                            {
+                              $match: {
+                                user_id: viewer_user_id_objectId
+                              }
                             }
-                          }
-                        ]
+                          ]
+                        }
                       }
-                    }
-                  ]
+                    ]
                   : []),
                 {
                   $addFields: {
@@ -1888,12 +1893,12 @@ class TwizzsService {
               as: 'user_likes',
               pipeline: viewer_user_id_objectId
                 ? [
-                  {
-                    $match: {
-                      user_id: viewer_user_id_objectId
+                    {
+                      $match: {
+                        user_id: viewer_user_id_objectId
+                      }
                     }
-                  }
-                ]
+                  ]
                 : []
             }
           },
@@ -1905,12 +1910,12 @@ class TwizzsService {
               as: 'user_bookmarks',
               pipeline: viewer_user_id_objectId
                 ? [
-                  {
-                    $match: {
-                      user_id: viewer_user_id_objectId
+                    {
+                      $match: {
+                        user_id: viewer_user_id_objectId
+                      }
                     }
-                  }
-                ]
+                  ]
                 : []
             }
           },
@@ -2012,10 +2017,7 @@ class TwizzsService {
 
     while (queue.length > 0) {
       const currentParentId = queue.shift() as ObjectId
-      const children = await databaseService.twizzs
-        .find({ parent_id: currentParentId })
-        .project({ _id: 1 })
-        .toArray()
+      const children = await databaseService.twizzs.find({ parent_id: currentParentId }).project({ _id: 1 }).toArray()
 
       if (children.length > 0) {
         const childIds = children.map((child) => child._id)
@@ -2025,9 +2027,7 @@ class TwizzsService {
     }
 
     // Lấy thông tin các bài viết để xóa media trên Cloudinary
-    const twizzsToDelete = await databaseService.twizzs
-      .find({ _id: { $in: allIdsToDelete } })
-      .toArray()
+    const twizzsToDelete = await databaseService.twizzs.find({ _id: { $in: allIdsToDelete } }).toArray()
 
     const urlsToDelete: string[] = []
     twizzsToDelete.forEach((twizz) => {

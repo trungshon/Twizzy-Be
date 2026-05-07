@@ -146,3 +146,9 @@ export const REPORT_MESSAGES = {
   ALREADY_REPORTED: 'Bạn đã báo cáo bài viết này rồi. Chúng tôi sẽ xử lý sớm nhất có thể.'
 } as const
 
+export const RECOMMENDATION_MESSAGES = {
+  GET_RECOMMENDATIONS_SUCCESSFULLY: 'Lấy gợi ý bài viết thành công',
+  GET_RECOMMENDATIONS_FAILED: 'Lấy gợi ý bài viết thất bại',
+  CACHE_INVALIDATED_SUCCESSFULLY: 'Đã làm mới cache gợi ý thành công'
+} as const
+
