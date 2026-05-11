@@ -108,7 +108,7 @@ class RecommendationService {
           sốBàiTrongPool: cached.items.length,
           ttlCòn_ms: cached.expiredAt - Date.now()
         })
-        return this.paginateAndPopulate(cached.items, cached.meta, userId, limit, page)
+        return this.paginateAndPopulate(cached.items, cached.meta, userId, limit, page, startTime)
       }
 
       // Pool cạn kiệt → xóa cache để tính lại
@@ -169,7 +169,7 @@ class RecommendationService {
 
     // Luôn trả về page 1 của pool mới (Flutter phát hiện qua response.page)
     recoLog('Orchestrator', 'Trả về trang 1 của pool mới (sau khi tính lại)', { userId, limit })
-    return this.paginateAndPopulate(internalResult.items, internalResult.meta, userId, limit, 1)
+    return this.paginateAndPopulate(internalResult.items, internalResult.meta, userId, limit, 1, startTime)
   }
 
   /**
@@ -180,7 +180,8 @@ class RecommendationService {
     meta: RecommendationMeta,
     userId: string,
     limit: number,
-    page: number
+    page: number,
+    startTime: number
   ): Promise<PaginatedRecommendations> {
     const total = items.length
     const total_page = Math.max(1, Math.ceil(total / limit))
@@ -206,7 +207,16 @@ class RecommendationService {
       processing_ms_trongMeta: meta.processing_time_ms
     })
 
-    return { twizzs, limit, page, total_page, metadata: meta }
+    return {
+      twizzs,
+      limit,
+      page,
+      total_page,
+      metadata: {
+        ...meta,
+        processing_time_ms: Date.now() - startTime
+      }
+    }
   }
 
   /**
@@ -777,16 +787,43 @@ class RecommendationService {
     }
 
     const followedIds = following.map((f) => f.followed_user_id)
+    const userObjectId = new ObjectId(userId)
 
-    const twizzs = await databaseService.twizzs
-      .find({
-        user_id: { $in: followedIds },
-        type: TwizzType.Twizz,
-        audience: TwizzAudience.Everyone
-      })
-      .sort({ created_at: -1 })
-      .limit(limit)
-      .toArray()
+    const pipeline = [
+      {
+        $match: {
+          user_id: { $in: followedIds },
+          type: { $in: [TwizzType.Twizz, TwizzType.QuoteTwizz] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user_id',
+          foreignField: '_id',
+          as: 'author'
+        }
+      },
+      { $unwind: '$author' },
+      {
+        $match: {
+          $or: [
+            { audience: TwizzAudience.Everyone },
+            {
+              $and: [
+                { audience: TwizzAudience.TwizzCircle },
+                { 'author.twizz_circle': userObjectId }
+              ]
+            }
+          ]
+        }
+      },
+      { $sort: { created_at: -1 as const } },
+      { $limit: limit },
+      { $project: { _id: 1 } }
+    ]
+
+    const twizzs = await databaseService.twizzs.aggregate(pipeline).toArray()
 
     recoLog('Orchestrator', 'getFollowingTwizzs', {
       userId,
@@ -807,18 +844,22 @@ class RecommendationService {
    * Lấy bài viết trending trong TRENDING_DAYS ngày gần nhất.
    */
   private async getTrendingTwizzs(userId: string, limit: number, excludeIds: Set<string>): Promise<ScoredItem[]> {
+    
+    // Bước 1: Xác định mốc thời gian (ví dụ: chỉ lấy bài trong TRENDING_DAYS ngày gần đây)
     const fromDate = new Date()
     fromDate.setDate(fromDate.getDate() - TRENDING_DAYS)
 
     const pipeline = [
+      // Bước 2: Lọc các bài viết thỏa mãn điều kiện cơ bản
       {
         $match: {
-          type: TwizzType.Twizz,
-          audience: TwizzAudience.Everyone,
-          user_id: { $ne: new ObjectId(userId) },
-          created_at: { $gte: fromDate }
+          type: { $in: [TwizzType.Twizz, TwizzType.QuoteTwizz] },// Lấy bài gốc và bài Quote, không lấy comment
+          audience: TwizzAudience.Everyone, // Chỉ bài public
+          user_id: { $ne: new ObjectId(userId) }, // Không lấy bài của chính người đang xem
+          created_at: { $gte: fromDate } // Nằm trong khoảng thời gian Trending
         }
       },
+      // Bước 3: Đếm số lượng Like (Join với bảng likes)
       {
         $lookup: {
           from: process.env.DB_LIKES_COLLECTION,
@@ -827,6 +868,7 @@ class RecommendationService {
           as: 'likes_data'
         }
       },
+      // Bước 4: Đếm số lượng Comment (Join với bảng twizzs nhưng lọc loại Comment)
       {
         $lookup: {
           from: process.env.DB_TWIZZS_COLLECTION,
@@ -841,6 +883,7 @@ class RecommendationService {
           as: 'comments_data'
         }
       },
+      // Bước 5: Đếm số lượng Quote (Join với bảng twizzs nhưng lọc loại QuoteTwizz)
       {
         $lookup: {
           from: process.env.DB_TWIZZS_COLLECTION,
@@ -855,20 +898,24 @@ class RecommendationService {
           as: 'quotes_data'
         }
       },
+      // Bước 6: Chuyển đổi mảng dữ liệu thành các con số và tính độ cũ của bài viết
       {
         $addFields: {
           like_count: { $size: '$likes_data' },
           comment_count: { $size: '$comments_data' },
           quote_count: { $size: '$quotes_data' },
           days_ago: {
+            // Tính số ngày kể từ khi đăng: (Bây giờ - Ngày đăng) / (mili giây trong 1 ngày)
             $divide: [{ $subtract: [new Date(), '$created_at'] }, 1000 * 60 * 60 * 24]
           }
         }
       },
+      // Bước 7: THUẬT TOÁN TRENDING SCORE (Công thức trọng số + Suy giảm theo thời gian)
       {
         $addFields: {
           trending_score: {
             $multiply: [
+              // Phần A: Tổng điểm tương tác có trọng số
               {
                 $add: [
                   { $multiply: ['$like_count', TRENDING_WEIGHTS.like] },
@@ -876,19 +923,24 @@ class RecommendationService {
                   { $multiply: ['$quote_count', TRENDING_WEIGHTS.quote] }
                 ]
               },
+              // Phần B: Hệ số suy giảm (Gravity) - Bài càng cũ thì chia cho số càng lớn -> điểm càng thấp
               { $divide: [1, { $add: [1, '$days_ago'] }] }
             ]
           }
         }
       },
+      // Bước 8: Sắp xếp theo điểm cao nhất lên đầu
       { $sort: { trending_score: -1 } },
+      // Bước 9: Lấy dư ra một chút (limit * 3) để lát nữa lọc bỏ bài trùng/bài đã xem
       { $limit: limit * 3 },
       { $project: { _id: 1, trending_score: 1 } }
     ]
 
     const results = await databaseService.twizzs.aggregate(pipeline).toArray()
 
+    // Bước 10: Loại bỏ những bài mà user đã xem hoặc cần loại trừ
     const filtered = results.filter((r) => !excludeIds.has(r._id!.toString()))
+    // Bước 11: Chuẩn hóa điểm số (Normalize) về khoảng [0, 1]
     const maxScore = filtered[0]?.trending_score ?? 1
 
     recoLog('Orchestrator', 'getTrendingTwizzs', {
@@ -902,9 +954,10 @@ class RecommendationService {
 
     return filtered.slice(0, limit).map((r) => ({
       twizz_id: r._id!,
+      // Điểm = Điểm hiện tại / Điểm cao nhất
       score: maxScore > 0 ? r.trending_score / maxScore : 0,
       reason: 'Bài viết đang được nhiều người quan tâm',
-      algorithm: 'trending' as const
+      algorithm: 'trending' as const 
     }))
   }
 
@@ -912,29 +965,44 @@ class RecommendationService {
    * Loại bỏ trùng lặp và đa dạng hóa kết quả.
    */
   private deduplicateAndDiversify(items: ScoredItem[], limit: number): ScoredItem[] {
+    // seenIds dùng để ghi nhớ: "ID này đã xuất hiện ở vị trí nào trong mảng deduplicated chưa?"
     const seenIds = new Map<string, number>()
     const deduplicated: ScoredItem[] = []
 
+
+    // Bước 1: Lặp qua từng bài viết trong danh sách thô (thường là gộp từ nhiều thuật toán)
     for (const item of items) {
       const key = item.twizz_id.toString()
       const existingIdx = seenIds.get(key)
+
+      // Nếu bài viết này đã tồn tại trong danh sách rồi (bị trùng) 
       if (existingIdx !== undefined) {
+        // KIỂM TRA ĐIỂM SỐ: Nếu bài mới này có điểm cao hơn bài cũ đã lưu
+        // (Ví dụ: Thuật toán Content-Based chấm 0.9, còn Trending chỉ chấm 0.5)
         if (item.score > deduplicated[existingIdx].score) {
+          // Thì cập nhật bằng bài có điểm cao hơn để giữ lợi ích tốt nhất cho user
           deduplicated[existingIdx] = item
         }
       } else {
+        // Nếu bài viết chưa từng xuất hiện:
+        // Lưu vị trí của nó vào Map để lát nữa nếu gặp lại thì biết bài này nằm ở đâu
         seenIds.set(key, deduplicated.length)
+        // Thêm bài viết vào danh sách kết quả
         deduplicated.push(item)
       }
     }
 
+    // Bước 2: Sắp xếp lại toàn bộ danh sách đã lọc trùng theo điểm số giảm dần
+    // Điều này đảm bảo những bài "xịn" nhất luôn lên đầu sau khi đã gộp các nguồn
     deduplicated.sort((a, b) => b.score - a.score)
+    
+    // Bước 3: Cắt danh sách theo đúng số lượng (limit) mà hệ thống yêu cầu (ví dụ: 60 bài)
     const out = deduplicated.slice(0, limit)
     recoLog('Orchestrator', 'deduplicateAndDiversify', {
-      đầuVào: items.length,
-      sauGộpTrùng: deduplicated.length,
-      sauCắtLimit: out.length,
-      limit
+      đầuVào: items.length, // Tổng số bài trước khi lọc
+      sauGộpTrùng: deduplicated.length, // Số bài còn lại sau khi xóa trùng
+      sauCắtLimit: out.length, // Số bài thực tế trả về
+      limit // Số bài tối đa được trả về
     })
     return out
   }

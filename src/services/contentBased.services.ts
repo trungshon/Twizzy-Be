@@ -268,30 +268,42 @@ class ContentBasedService {
     // Lấy thông tin user để check twizz_circle
     const user = await databaseService.users.findOne({ _id: userObjectId }, { projection: { twizz_circle: 1 } })
 
-    const candidates = await databaseService.twizzs
-      .find({
-        _id: { $nin: excludeIds },
-        user_id: { $ne: userObjectId },
-        type: TwizzType.Twizz, // Chỉ lấy bài gốc, không lấy comment/quote
-        audience: TwizzAudience.Everyone, // Chỉ bài public
-        created_at: { $gte: sixMonthsAgo }
-      })
-      .limit(500) // Giới hạn để tránh tính toán quá nhiều
-      .toArray()
-
-    // Lọc thêm TwizzCircle (nếu user nằm trong circle của tác giả thì được xem)
-    if (user) {
-      const userCircles = (user.twizz_circle ?? []).map((id: ObjectId) => id.toString())
-      return candidates.filter((twizz) => {
-        if (twizz.audience === TwizzAudience.Everyone) return true
-        if (twizz.audience === TwizzAudience.TwizzCircle) {
-          return userCircles.includes(twizz.user_id.toString())
+    const pipeline = [
+      {
+        $match: {
+          _id: { $nin: excludeIds },
+          user_id: { $ne: userObjectId },
+          type: { $in: [TwizzType.Twizz, TwizzType.QuoteTwizz] },
+          created_at: { $gte: sixMonthsAgo }
         }
-        return false
-      })
-    }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user_id',
+          foreignField: '_id',
+          as: 'author'
+        }
+      },
+      { $unwind: '$author' },
+      {
+        $match: {
+          $or: [
+            { audience: TwizzAudience.Everyone },
+            {
+              $and: [
+                { audience: TwizzAudience.TwizzCircle },
+                { 'author.twizz_circle': userObjectId }
+              ]
+            }
+          ]
+        }
+      },
+      { $limit: 500 }
+    ]
 
-    return candidates
+    const candidates = await databaseService.twizzs.aggregate(pipeline).toArray()
+    return candidates as any[]
   }
 
   /**

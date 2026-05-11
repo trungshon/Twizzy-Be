@@ -2050,6 +2050,9 @@ class TwizzsService {
       })
     ])
 
+    // Xóa cache gợi ý của user
+    recommendationService.invalidateUserCache(user_id)
+
     return { message: TWIZZ_MESSAGES.DELETE_TWIZZ_SUCCESSFULLY }
   }
 }

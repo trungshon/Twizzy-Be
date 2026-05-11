@@ -17,6 +17,7 @@ import Follower from '~/models/schemas/Follower.schema'
 import { HTTP_STATUS } from '~/constants/httpStatus'
 import { ErrorWithStatus } from '~/models/Errors'
 import axios from 'axios'
+import recommendationService from './recommendations.services'
 config()
 
 class UsersService {
@@ -647,6 +648,9 @@ class UsersService {
         sender_id: user_id,
         type: NotificationType.Follow
       })
+      // Xóa cache gợi ý của user
+      recommendationService.invalidateUserCache(user_id)
+
       return { message: USER_MESSAGES.FOLLOW_SUCCESSFULLY }
     }
     return { message: USER_MESSAGES.FOLLOWED_ALREADY }
@@ -663,6 +667,9 @@ class UsersService {
       user_id: new ObjectId(user_id),
       followed_user_id: new ObjectId(followed_user_id)
     })
+    // Xóa cache gợi ý của user
+    recommendationService.invalidateUserCache(user_id)
+
     return { message: USER_MESSAGES.UNFOLLOW_SUCCESSFULLY }
   }
 

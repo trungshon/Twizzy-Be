@@ -402,23 +402,39 @@ class CollaborativeFilteringService {
 
     const twizzIds = predictions.map((p) => new ObjectId(p.twizzId))
     const twizzs = await databaseService.twizzs
-      .find(
-        { _id: { $in: twizzIds }, type: TwizzType.Twizz }, // Chỉ bài gốc
-        { projection: { _id: 1, audience: 1, user_id: 1 } }
-      )
+      .aggregate([
+        { $match: { _id: { $in: twizzIds }, type: { $in: [TwizzType.Twizz, TwizzType.QuoteTwizz] } } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: 'author'
+          }
+        },
+        { $unwind: '$author' },
+        {
+          $project: {
+            _id: 1,
+            audience: 1,
+            user_id: 1,
+            'author.twizz_circle': 1
+          }
+        }
+      ])
       .toArray()
 
-    // Lấy thông tin user để check twizz_circle
-    const user = await databaseService.users.findOne({ _id: new ObjectId(userId) }, { projection: { twizz_circle: 1 } })
-    const userCircles = new Set((user?.twizz_circle ?? []).map((id: ObjectId) => id.toString()))
 
     // Tập hợp các twizz_id có thể xem
     const accessibleIds = new Set<string>()
     for (const twizz of twizzs) {
       if (twizz.audience === TwizzAudience.Everyone) {
         accessibleIds.add(twizz._id!.toString())
-      } else if (twizz.audience === TwizzAudience.TwizzCircle && userCircles.has(twizz.user_id.toString())) {
-        accessibleIds.add(twizz._id!.toString())
+      } else if (twizz.audience === TwizzAudience.TwizzCircle) {
+        const authorCircle = (twizz.author.twizz_circle ?? []).map((id: ObjectId) => id.toString())
+        if (authorCircle.includes(userId)) {
+          accessibleIds.add(twizz._id!.toString())
+        }
       }
     }
 
