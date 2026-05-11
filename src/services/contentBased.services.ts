@@ -3,6 +3,7 @@ import databaseService from './database.services'
 import nlpService from './nlp.services'
 import { TwizzType, TwizzAudience } from '~/constants/enum'
 import Twizz from '~/models/schemas/Twizz.schema'
+import { recoLog } from '~/utils/recommendationLogger'
 
 // Kết quả gợi ý từ Content-Based Filtering
 export interface ContentBasedResult {
@@ -51,34 +52,59 @@ class ContentBasedService {
    * với các bài viết candidate.
    */
   async getRecommendations(userId: string, limit: number): Promise<ContentBasedResult[]> {
+    recoLog('ContentBased', 'Bắt đầu getRecommendations', { userId, limit })
+
     // Lấy danh sách bài đã tương tác (like, comment, quote)
     const interactedTwizzIds = await this.getInteractedTwizzIds(userId)
 
+    recoLog('ContentBased', 'Đã tải map tương tác (distinct twizz)', {
+      userId,
+      distinctTwizz: interactedTwizzIds.size
+    })
+
     if (interactedTwizzIds.size === 0) {
+      recoLog('ContentBased', 'Dừng: chưa có twizz nào được tương tác', { userId })
       return []
     }
 
     // Xây dựng User Profile vector
     const userProfile = await this.buildUserProfile(userId, interactedTwizzIds)
     if (userProfile.size === 0) {
+      recoLog('ContentBased', 'Dừng: user profile rỗng sau NLP/ghi nhận', { userId })
       return []
     }
+
+    recoLog('ContentBased', 'User profile vector', { userId, sốChiều: userProfile.size })
 
     // Lấy danh sách bài viết candidate (loại trừ đã tương tác và bài của chính user)
     const candidates = await this.getCandidateTwizzs(userId, interactedTwizzIds)
     if (candidates.length === 0) {
+      recoLog('ContentBased', 'Dừng: không có candidate sau filter', { userId })
       return []
     }
 
+    recoLog('ContentBased', 'Danh sách candidate', { userId, sốCandidate: candidates.length })
+
     // Tính IDF từ corpus
     const idf = await this.getOrComputeIDF()
+
+    recoLog('ContentBased', 'IDF sẵn sàng', { userId, sốTerm: idf.size })
 
     // Tính Cosine Similarity giữa User Profile và từng candidate
     const scored = await this.scoreCandiates(candidates, userProfile, idf)
 
     // Sắp xếp giảm dần theo điểm số và lấy top N
     scored.sort((a, b) => b.score - a.score)
-    return scored.slice(0, limit)
+    const top = scored.slice(0, limit)
+
+    recoLog('ContentBased', 'Hoàn tất scoring', {
+      userId,
+      scoredTrướcCắt: scored.length,
+      trảVề: top.length,
+      điểmCaoNhất: top[0]?.score
+    })
+
+    return top
   }
 
   /**
@@ -124,6 +150,14 @@ class ContentBasedService {
       }
     }
 
+    recoLog('ContentBased', 'getInteractedTwizzIds', {
+      userId,
+      likes: likes.length,
+      comments: comments.length,
+      quotes: quotes.length,
+      distinctTwizz: interactionMap.size
+    })
+
     return interactionMap
   }
 
@@ -135,10 +169,15 @@ class ContentBasedService {
     // Kiểm tra cache
     const cached = this.userProfileCache.get(userId)
     if (cached && cached.expiredAt > Date.now()) {
+      recoLog('ContentBased', 'buildUserProfile: dùng cache', {
+        userId,
+        ttlCòn_ms: cached.expiredAt - Date.now()
+      })
       return cached.vector
     }
 
     if (interactedTwizzIds.size === 0) {
+      recoLog('ContentBased', 'buildUserProfile: không có twizz tương tác', { userId })
       return new Map()
     }
 
@@ -149,6 +188,7 @@ class ContentBasedService {
       .toArray()
 
     if (twizzs.length === 0) {
+      recoLog('ContentBased', 'buildUserProfile: DB không trả twizz đã tương tác', { userId })
       return new Map()
     }
 
@@ -204,6 +244,12 @@ class ContentBasedService {
       expiredAt: Date.now() + this.USER_PROFILE_TTL
     })
 
+    recoLog('ContentBased', 'buildUserProfile: đã tính + lưu cache', {
+      userId,
+      sốTwizzGhépProfile: twizzs.length,
+      sốChiềuVector: normalized.size
+    })
+
     return normalized
   }
 
@@ -254,8 +300,14 @@ class ContentBasedService {
    */
   private async getOrComputeIDF(): Promise<Map<string, number>> {
     if (this.idfCache && this.idfCache.expiredAt > Date.now()) {
+      recoLog('ContentBased', 'getOrComputeIDF: dùng cache', {
+        sốTerm: this.idfCache.idf.size,
+        ttlCòn_ms: this.idfCache.expiredAt - Date.now()
+      })
       return this.idfCache.idf
     }
+
+    recoLog('ContentBased', 'getOrComputeIDF: tính mới từ corpus', {})
 
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - CORPUS_MONTHS)
@@ -268,6 +320,7 @@ class ContentBasedService {
 
     const totalDocs = corpusTwizzs.length
     if (totalDocs === 0) {
+      recoLog('ContentBased', 'getOrComputeIDF: corpus rỗng', {})
       return new Map()
     }
 
@@ -302,6 +355,11 @@ class ContentBasedService {
     // Lưu cache
     this.idfCache = { idf, expiredAt: Date.now() + this.IDF_TTL }
 
+    recoLog('ContentBased', 'getOrComputeIDF: hoàn tất', {
+      corpusDocs: totalDocs,
+      sốTerm: idf.size
+    })
+
     return idf
   }
 
@@ -314,6 +372,10 @@ class ContentBasedService {
     idf: Map<string, number>
   ): Promise<ContentBasedResult[]> {
     const results: ContentBasedResult[] = []
+
+    recoLog('ContentBased', 'scoreCandiates: bắt đầu', {
+      sốCandidate: candidates.length
+    })
 
     // Lấy tên hashtag cho tất cả candidate
     const allHashtagIds = candidates.flatMap((t) => t.hashtags)
@@ -337,6 +399,10 @@ class ContentBasedService {
 
     // Xử lý NLP batch cho những bài chưa cache
     if (textsToProcess.length > 0) {
+      recoLog('ContentBased', 'scoreCandiates: cần NLP cho bài chưa cache vector', {
+        đãCacheVector: cachedVectors.size,
+        cầnXửLý: textsToProcess.length
+      })
       const nlpResults = await nlpService.processBatch(textsToProcess.map((t) => t.text))
 
       nlpResults.forEach((nlpResult, i) => {
@@ -373,6 +439,10 @@ class ContentBasedService {
 
         cachedVectors.set(idx, normalizedVector)
       })
+    } else {
+      recoLog('ContentBased', 'scoreCandiates: toàn bộ vector candidate đã có cache', {
+        sốCandidate: candidates.length
+      })
     }
 
     // Tính Cosine Similarity
@@ -390,6 +460,10 @@ class ContentBasedService {
         })
       }
     }
+
+    recoLog('ContentBased', 'scoreCandiates: hoàn tất cosine', {
+      sốKếtQuảTrênNgưỡng: results.length
+    })
 
     return results
   }
@@ -452,6 +526,7 @@ class ContentBasedService {
    * Gọi từ likes/comments/quotes service sau khi có tương tác mới.
    */
   invalidateUserCache(userId: string): void {
+    recoLog('ContentBased', 'invalidateUserCache (profile)', { userId })
     this.userProfileCache.delete(userId)
   }
 }

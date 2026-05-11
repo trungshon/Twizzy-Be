@@ -1,5 +1,6 @@
 import { spawn } from 'child_process'
 import path from 'path'
+import { recoLog } from '~/utils/recommendationLogger'
 
 // Kết quả trả về từ Python script
 interface NLPResult {
@@ -58,8 +59,11 @@ class NLPService {
       })
 
       return nlpResult
-    } catch {
+    } catch (err) {
       // Fallback: tách từ đơn giản nếu Python không khả dụng
+      recoLog('NLP', 'processText: lỗi Python → fallback đơn giản', {
+        lỗi: err instanceof Error ? err.message : String(err)
+      })
       return this.fallbackProcess(text)
     }
   }
@@ -70,6 +74,8 @@ class NLPService {
    */
   async processBatch(texts: string[]): Promise<NLPResult[]> {
     if (!texts.length) return []
+
+    recoLog('NLP', 'processBatch: bắt đầu', { tổngText: texts.length })
 
     const results: NLPResult[] = new Array(texts.length)
     const uncachedIndices: number[] = []
@@ -93,6 +99,10 @@ class NLPService {
 
     // Gọi Python batch cho những text chưa cache
     if (uncachedTexts.length > 0) {
+      recoLog('NLP', 'processBatch: gọi Python cho phần chưa cache', {
+        đãCache: texts.length - uncachedTexts.length,
+        chưaCache: uncachedTexts.length
+      })
       try {
         const batchResult = await this.callPythonScript(JSON.stringify(uncachedTexts))
         const { batch_results } = batchResult as NLPBatchResult
@@ -107,13 +117,21 @@ class NLPService {
             expiredAt: Date.now() + this.CACHE_TTL_MS
           })
         })
-      } catch {
+      } catch (err) {
         // Fallback cho tất cả text chưa cache
+        recoLog('NLP', 'processBatch: lỗi Python → fallback toàn bộ batch chưa cache', {
+          sốText: uncachedTexts.length,
+          lỗi: err instanceof Error ? err.message : String(err)
+        })
         uncachedIndices.forEach((originalIdx, idx) => {
           results[originalIdx] = this.fallbackProcess(uncachedTexts[idx])
         })
       }
+    } else {
+      recoLog('NLP', 'processBatch: toàn bộ text đã có trong cache', { tổngText: texts.length })
     }
+
+    recoLog('NLP', 'processBatch: hoàn tất', { tổngText: texts.length })
 
     return results
   }

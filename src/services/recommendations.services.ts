@@ -3,6 +3,7 @@ import databaseService from './database.services'
 import contentBasedService from './contentBased.services'
 import collaborativeFilteringService from './collaborativeFiltering.services'
 import { TwizzType, TwizzAudience } from '~/constants/enum'
+import { recoLog } from '~/utils/recommendationLogger'
 
 // Kết quả gợi ý trung gian (chỉ lưu ID + điểm số, chưa populate)
 interface ScoredItem {
@@ -86,6 +87,13 @@ class RecommendationService {
   async getHybridRecommendations(userId: string, limit: number, page: number): Promise<PaginatedRecommendations> {
     const startTime = Date.now()
 
+    recoLog('Orchestrator', 'Bắt đầu getHybridRecommendations', {
+      userId,
+      limit,
+      page,
+      poolSizeTốiĐa: RECOMMENDATION_POOL_SIZE
+    })
+
     // Kiểm tra cache (key = userId, không phụ thuộc limit/page)
     const cached = this.scoredCache.get(userId)
     if (cached && cached.expiredAt > Date.now()) {
@@ -93,26 +101,55 @@ class RecommendationService {
 
       if (page <= totalPage) {
         // Pool chưa hết → phục vụ từ cache
+        recoLog('Orchestrator', 'Dùng pool đã cache (trang nằm trong pool)', {
+          userId,
+          page,
+          totalPage,
+          sốBàiTrongPool: cached.items.length,
+          ttlCòn_ms: cached.expiredAt - Date.now()
+        })
         return this.paginateAndPopulate(cached.items, cached.meta, userId, limit, page)
       }
 
       // Pool cạn kiệt → xóa cache để tính lại
+      recoLog('Orchestrator', 'Pool hết trang → xóa cache, sẽ tính lại pool mới', {
+        userId,
+        pageYêuCầu: page,
+        totalPageTrướcĐó: totalPage,
+        limit
+      })
+      this.scoredCache.delete(userId)
+    } else if (cached) {
+      recoLog('Orchestrator', 'Cache pool hết hạn TTL', { userId })
       this.scoredCache.delete(userId)
     }
 
     // Tính chỉ số tương tác để chọn chiến lược
     const { effectiveCount, distinctTwizzCount } = await this.computeEffectiveInteractions(userId)
 
+    recoLog('Orchestrator', 'Chỉ số cold start / hybrid', {
+      effectiveCount,
+      distinctTwizzCount,
+      ngưỡngEffective: EFFECTIVE_INTERACTION_THRESHOLD,
+      ngưỡngDistinctTwizz: MIN_DISTINCT_TWIZZ
+    })
+
     let internalResult: InternalResult
 
     if (effectiveCount === 0) {
       // Trường hợp 1: Chưa có tương tác nào -> Cold Start
+      recoLog('Orchestrator', 'Chiến lược: Cold Start (chưa có tương tác)', { userId })
       internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, startTime)
     } else if (effectiveCount < EFFECTIVE_INTERACTION_THRESHOLD || distinctTwizzCount < MIN_DISTINCT_TWIZZ) {
       // Trường hợp 2: Ít tương tác -> Content-Based only
+      recoLog('Orchestrator', 'Chiến lược: Content-Based only (+ trending nếu thiếu)', {
+        userId,
+        lýDo: effectiveCount < EFFECTIVE_INTERACTION_THRESHOLD ? 'effective < ngưỡng' : 'distinct_twizz < ngưỡng'
+      })
       internalResult = await this.contentBasedOnlyRecommendations(userId, RECOMMENDATION_POOL_SIZE, startTime)
     } else {
       // Trường hợp 3: Đủ tương tác -> Hybrid
+      recoLog('Orchestrator', 'Chiến lược: Hybrid (Content + Collaborative)', { userId })
       internalResult = await this.hybridRecommendations(userId, RECOMMENDATION_POOL_SIZE, startTime)
     }
 
@@ -123,7 +160,15 @@ class RecommendationService {
       expiredAt: Date.now() + this.SCORED_TTL
     })
 
+    recoLog('Orchestrator', 'Đã lưu pool mới vào cache', {
+      userId,
+      sốBàiTrongPool: internalResult.items.length,
+      meta: internalResult.meta,
+      ttl_ms: this.SCORED_TTL
+    })
+
     // Luôn trả về page 1 của pool mới (Flutter phát hiện qua response.page)
+    recoLog('Orchestrator', 'Trả về trang 1 của pool mới (sau khi tính lại)', { userId, limit })
     return this.paginateAndPopulate(internalResult.items, internalResult.meta, userId, limit, 1)
   }
 
@@ -141,7 +186,26 @@ class RecommendationService {
     const total_page = Math.max(1, Math.ceil(total / limit))
     const pageItems = items.slice((page - 1) * limit, page * limit)
     const twizzIds = pageItems.map((i) => i.twizz_id)
+
+    recoLog('Orchestrator', 'Phân trang + populate', {
+      userId,
+      page,
+      limit,
+      tổngBàiTrongPool: total,
+      total_page,
+      bàiTrênTrangNày: twizzIds.length,
+      chỉSốSlice: { từ: (page - 1) * limit, đến: page * limit - 1 }
+    })
+
     const twizzs = await this.populateTwizzsByIds(twizzIds, userId)
+
+    recoLog('Orchestrator', 'Populate xong', {
+      userId,
+      page,
+      sốTwizzTrảVề: twizzs.length,
+      processing_ms_trongMeta: meta.processing_time_ms
+    })
+
     return { twizzs, limit, page, total_page, metadata: meta }
   }
 
@@ -150,7 +214,15 @@ class RecommendationService {
    * Kết quả giữ nguyên thứ tự theo score (thứ tự của twizzIds đầu vào).
    */
   private async populateTwizzsByIds(twizzIds: ObjectId[], userId: string): Promise<any[]> {
-    if (twizzIds.length === 0) return []
+    if (twizzIds.length === 0) {
+      recoLog('Orchestrator', 'populateTwizzsByIds: danh sách rỗng, bỏ qua aggregation', { userId })
+      return []
+    }
+
+    recoLog('Orchestrator', 'populateTwizzsByIds: chạy aggregation join user/hashtag/likes...', {
+      userId,
+      sốId: twizzIds.length
+    })
 
     const user_id_objectId = new ObjectId(userId)
 
@@ -477,6 +549,13 @@ class RecommendationService {
     }
 
     const distinctTwizzCount = interactedMap.size
+
+    recoLog('Orchestrator', 'computeEffectiveInteractions', {
+      userId,
+      effectiveCount,
+      distinctTwizzCount
+    })
+
     return { effectiveCount, distinctTwizzCount }
   }
 
@@ -488,6 +567,8 @@ class RecommendationService {
       user_id: new ObjectId(userId)
     })
 
+    recoLog('Orchestrator', 'coldStartRecommendations: số người đang follow', { userId, followingCount, limit })
+
     let followingItems: ScoredItem[] = []
     let trendingItems: ScoredItem[] = []
 
@@ -495,14 +576,29 @@ class RecommendationService {
       const followingLimit = Math.ceil(limit * COLD_START_FOLLOW_WEIGHTS.following)
       const trendingLimit = limit - followingLimit
 
+      recoLog('Orchestrator', 'Cold Start: user có follow → following + trending', {
+        userId,
+        followingCount,
+        followingLimit,
+        trendingLimit
+      })
+
       followingItems = await this.getFollowingTwizzs(userId, followingLimit)
       trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, new Set())
     } else {
+      recoLog('Orchestrator', 'Cold Start: user không follow ai → chỉ trending', { userId, limit })
       trendingItems = await this.getTrendingTwizzs(userId, limit, new Set())
     }
 
     const combined = [...followingItems, ...trendingItems]
     const deduplicated = this.deduplicateAndDiversify(combined, limit)
+
+    recoLog('Orchestrator', 'Cold Start: sau dedupe', {
+      userId,
+      following_raw: followingItems.length,
+      trending_raw: trendingItems.length,
+      sauDedupe: deduplicated.length
+    })
 
     return this.buildInternalResult(
       deduplicated,
@@ -519,6 +615,7 @@ class RecommendationService {
     limit: number,
     startTime: number
   ): Promise<InternalResult> {
+    recoLog('Orchestrator', 'Content-only: gọi Content-Based', { userId, limit })
     const contentResults = await contentBasedService.getRecommendations(userId, limit)
 
     const contentItems: ScoredItem[] = contentResults.map((r) => ({
@@ -533,11 +630,23 @@ class RecommendationService {
     if (contentItems.length < limit) {
       const remaining = limit - contentItems.length
       const excludeIds = new Set(contentItems.map((t) => t.twizz_id.toString()))
+      recoLog('Orchestrator', 'Content-only: thiếu bài → bổ sung trending', {
+        userId,
+        contentCount: contentItems.length,
+        remaining
+      })
       trendingItems = await this.getTrendingTwizzs(userId, remaining, excludeIds)
     }
 
     const combined = [...contentItems, ...trendingItems]
     const deduplicated = this.deduplicateAndDiversify(combined, limit)
+
+    recoLog('Orchestrator', 'Content-only: sau dedupe', {
+      userId,
+      content_raw: contentItems.length,
+      trending_raw: trendingItems.length,
+      sauDedupe: deduplicated.length
+    })
 
     return this.buildInternalResult(
       deduplicated,
@@ -550,16 +659,24 @@ class RecommendationService {
    * Hybrid: kết hợp Content-Based (70%) và Collaborative (30%).
    */
   private async hybridRecommendations(userId: string, limit: number, startTime: number): Promise<InternalResult> {
+    recoLog('Orchestrator', 'Hybrid: song song Content-Based + CF', { userId, limit })
     const [contentResults, collaborativeResults] = await Promise.all([
       contentBasedService.getRecommendations(userId, limit),
       collaborativeFilteringService.getRecommendations(userId, limit)
     ])
+
+    recoLog('Orchestrator', 'Hybrid: kết quả thô từ 2 nhánh', {
+      userId,
+      contentCount: contentResults.length,
+      collaborativeCount: collaborativeResults.length
+    })
 
     let contentCount = 0
     let collaborativeCount = 0
 
     // Fallback khi không tìm được similar users
     if (collaborativeResults.length === 0) {
+      recoLog('Orchestrator', 'Hybrid: CF rỗng → fallback content + trending', { userId })
       const contentItems: ScoredItem[] = contentResults.map((r) => ({
         twizz_id: r.twizz_id,
         score: r.score * FALLBACK_WEIGHTS.content,
@@ -573,6 +690,11 @@ class RecommendationService {
 
       const combined = [...contentItems, ...trendingItems]
       const deduplicated = this.deduplicateAndDiversify(combined, limit)
+
+      recoLog('Orchestrator', 'Hybrid fallback: sau dedupe', {
+        userId,
+        sauDedupe: deduplicated.length
+      })
 
       return this.buildInternalResult(
         deduplicated,
@@ -625,6 +747,15 @@ class RecommendationService {
     hybridItems.sort((a, b) => b.score - a.score)
     const deduplicated = this.deduplicateAndDiversify(hybridItems, limit)
 
+    recoLog('Orchestrator', 'Hybrid: sau gộp điểm + dedupe', {
+      userId,
+      scoreMapSize: scoreMap.size,
+      hybridItemsTrướcDedupe: hybridItems.length,
+      sauDedupe: deduplicated.length,
+      contentCount,
+      collaborativeCount
+    })
+
     return this.buildInternalResult(
       deduplicated,
       { content: contentCount, collaborative: collaborativeCount },
@@ -640,7 +771,10 @@ class RecommendationService {
       .find({ user_id: new ObjectId(userId) }, { projection: { followed_user_id: 1 } })
       .toArray()
 
-    if (following.length === 0) return []
+    if (following.length === 0) {
+      recoLog('Orchestrator', 'getFollowingTwizzs: không có follow', { userId })
+      return []
+    }
 
     const followedIds = following.map((f) => f.followed_user_id)
 
@@ -653,6 +787,13 @@ class RecommendationService {
       .sort({ created_at: -1 })
       .limit(limit)
       .toArray()
+
+    recoLog('Orchestrator', 'getFollowingTwizzs', {
+      userId,
+      sốNgườiFollow: followedIds.length,
+      sốBàiLấyĐược: twizzs.length,
+      limit
+    })
 
     return twizzs.map((t, idx) => ({
       twizz_id: t._id!,
@@ -750,6 +891,15 @@ class RecommendationService {
     const filtered = results.filter((r) => !excludeIds.has(r._id!.toString()))
     const maxScore = filtered[0]?.trending_score ?? 1
 
+    recoLog('Orchestrator', 'getTrendingTwizzs', {
+      userId,
+      limit,
+      excludeCount: excludeIds.size,
+      pipelineRaw: results.length,
+      sauLọcExclude: filtered.length,
+      maxTrendingScore: maxScore
+    })
+
     return filtered.slice(0, limit).map((r) => ({
       twizz_id: r._id!,
       score: maxScore > 0 ? r.trending_score / maxScore : 0,
@@ -779,7 +929,14 @@ class RecommendationService {
     }
 
     deduplicated.sort((a, b) => b.score - a.score)
-    return deduplicated.slice(0, limit)
+    const out = deduplicated.slice(0, limit)
+    recoLog('Orchestrator', 'deduplicateAndDiversify', {
+      đầuVào: items.length,
+      sauGộpTrùng: deduplicated.length,
+      sauCắtLimit: out.length,
+      limit
+    })
+    return out
   }
 
   /**
@@ -807,6 +964,7 @@ class RecommendationService {
    * Xóa cache của user khi có tương tác mới.
    */
   invalidateUserCache(userId: string): void {
+    recoLog('Orchestrator', 'invalidateUserCache', { userId })
     this.scoredCache.delete(userId)
     contentBasedService.invalidateUserCache(userId)
     collaborativeFilteringService.invalidateUserSimilarityCache(userId)

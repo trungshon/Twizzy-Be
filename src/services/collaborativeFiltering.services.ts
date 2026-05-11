@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb'
 import databaseService from './database.services'
 import { TwizzType, TwizzAudience } from '~/constants/enum'
+import { recoLog } from '~/utils/recommendationLogger'
 
 // Kết quả gợi ý từ Collaborative Filtering
 export interface CollaborativeResult {
@@ -48,43 +49,89 @@ class CollaborativeFilteringService {
    * Dựa trên nguyên lý: "người có sở thích giống tôi thích gì, tôi cũng sẽ thích".
    */
   async getRecommendations(userId: string, limit: number): Promise<CollaborativeResult[]> {
+    recoLog('CF', 'Bắt đầu getRecommendations', { userId, limit })
+
     // Xây dựng ma trận User-Item
     const userItemMatrix = await this.getOrBuildUserItemMatrix()
-    if (userItemMatrix.size === 0) return []
+    if (userItemMatrix.size === 0) {
+      recoLog('CF', 'Dừng: ma trận User-Item rỗng', { userId })
+      return []
+    }
 
     const userRow = userItemMatrix.get(userId)
-    if (!userRow || userRow.size === 0) return []
+    if (!userRow || userRow.size === 0) {
+      recoLog('CF', 'Dừng: user không có dòng trong ma trận (chưa tương tác twizz nào)', {
+        userId,
+        cóTrongMatrix: userItemMatrix.has(userId),
+        sốItem: userRow?.size ?? 0
+      })
+      return []
+    }
 
     // Tính mean rating của user hiện tại (dùng cho normalization và dự đoán)
     const userMean = this.computeMean(userRow)
 
+    recoLog('CF', 'User mean rating (raw matrix)', { userId, userMean, sốTwizzĐãTươngTác: userRow.size })
+
     // Tìm top K users tương tự
     const similarUsers = await this.findSimilarUsers(userId, userItemMatrix, userMean)
-    if (similarUsers.length === 0) return []
+    if (similarUsers.length === 0) {
+      recoLog('CF', 'Dừng: không tìm được user tương tự (common items < MIN hoặc similarity = 0)', {
+        userId,
+        MIN_COMMON_ITEMS
+      })
+      return []
+    }
+
+    recoLog('CF', 'Danh sách user tương tự (top K)', {
+      userId,
+      sốSimilar: similarUsers.length,
+      similarityCaoNhất: similarUsers[0]?.similarity
+    })
 
     // Lấy các bài viết candidate: bài mà similar users đã tương tác nhưng user hiện tại chưa
     const interactedTwizzIds = new Set(userRow.keys())
     const candidateTwizzIds = this.getCandidateTwizzIds(similarUsers, userItemMatrix, interactedTwizzIds)
 
-    if (candidateTwizzIds.size === 0) return []
+    if (candidateTwizzIds.size === 0) {
+      recoLog('CF', 'Dừng: không có candidate twizz từ similar users', { userId })
+      return []
+    }
+
+    recoLog('CF', 'Candidate twizz từ similar users', { userId, sốCandidate: candidateTwizzIds.size })
 
     // Dự đoán rating cho từng candidate
     const predictions = this.predictRatings(userId, candidateTwizzIds, similarUsers, userItemMatrix, userMean)
 
-    if (predictions.length === 0) return []
+    if (predictions.length === 0) {
+      recoLog('CF', 'Dừng: predictRatings không cho kết quả', { userId })
+      return []
+    }
+
+    recoLog('CF', 'Sau predictRatings', { userId, sốPrediction: predictions.length })
 
     // Lọc bài viết theo quyền truy cập
     const accessiblePredictions = await this.filterByAccessibility(userId, predictions)
+
+    recoLog('CF', 'Sau filterByAccessibility', {
+      userId,
+      trước: predictions.length,
+      sau: accessiblePredictions.length
+    })
 
     // Chuẩn hóa điểm về [0, 1] và sắp xếp
     const normalized = this.normalizePredictions(accessiblePredictions)
     normalized.sort((a, b) => b.score - a.score)
 
-    return normalized.slice(0, limit).map((p) => ({
+    const out = normalized.slice(0, limit).map((p) => ({
       twizz_id: new ObjectId(p.twizzId),
       score: p.score,
       reason: 'Người dùng có sở thích tương tự bạn cũng đã tương tác với bài viết này'
     }))
+
+    recoLog('CF', 'Hoàn tất getRecommendations', { userId, trảVề: out.length, điểmCaoNhất: out[0]?.score })
+
+    return out
   }
 
   /**
@@ -93,8 +140,14 @@ class CollaborativeFilteringService {
    */
   private async getOrBuildUserItemMatrix(): Promise<Map<string, Map<string, number>>> {
     if (this.userItemMatrixCache && this.userItemMatrixCache.expiredAt > Date.now()) {
+      recoLog('CF', 'getOrBuildUserItemMatrix: dùng cache', {
+        sốUser: this.userItemMatrixCache.matrix.size,
+        ttlCòn_ms: this.userItemMatrixCache.expiredAt - Date.now()
+      })
       return this.userItemMatrixCache.matrix
     }
+
+    recoLog('CF', 'getOrBuildUserItemMatrix: build mới (likes + comments + quotes)', {})
 
     const matrix = new Map<string, Map<string, number>>()
 
@@ -138,6 +191,18 @@ class CollaborativeFilteringService {
     }
 
     this.userItemMatrixCache = { matrix, expiredAt: Date.now() + this.MATRIX_TTL }
+
+    let totalCells = 0
+    for (const row of matrix.values()) totalCells += row.size
+
+    recoLog('CF', 'getOrBuildUserItemMatrix: hoàn tất', {
+      sốUser: matrix.size,
+      tổngÔUserItem: totalCells,
+      likes: likes.length,
+      comments: comments.length,
+      quotes: quotes.length
+    })
+
     return matrix
   }
 
@@ -163,6 +228,11 @@ class CollaborativeFilteringService {
     // Kiểm tra cache
     const cached = this.similarityCache.get(userId)
     if (cached && cached.expiredAt > Date.now()) {
+      recoLog('CF', 'findSimilarUsers: dùng cache similarity', {
+        userId,
+        sốSimilar: cached.similarities.length,
+        ttlCòn_ms: cached.expiredAt - Date.now()
+      })
       // Lấy mean từ ma trận hiện tại để tính prediction
       return cached.similarities.map((s) => ({
         ...s,
@@ -171,7 +241,17 @@ class CollaborativeFilteringService {
     }
 
     const userRow = matrix.get(userId)
-    if (!userRow) return []
+    if (!userRow) {
+      recoLog('CF', 'findSimilarUsers: không có userRow', { userId })
+      return []
+    }
+
+    recoLog('CF', 'findSimilarUsers: quét toàn bộ user khác (chưa cache)', {
+      userId,
+      tổngUserTrongMatrix: matrix.size,
+      TOP_K_USERS,
+      MIN_COMMON_ITEMS
+    })
 
     // Vector đã normalize (mean offset) của user hiện tại
     const normalizedUserVec = this.meanOffsetNormalize(userRow, userMean)
@@ -206,6 +286,8 @@ class CollaborativeFilteringService {
       similarities: topK.map((s) => ({ userId: s.userId, similarity: s.similarity })),
       expiredAt: Date.now() + this.SIMILARITY_TTL
     })
+
+    recoLog('CF', 'findSimilarUsers: đã lưu cache topK', { userId, sốTopK: topK.length })
 
     return topK
   }
@@ -366,6 +448,7 @@ class CollaborativeFilteringService {
    * Xóa cache khi có tương tác mới (được gọi từ service khác).
    */
   invalidateMatrixCache(): void {
+    recoLog('CF', 'invalidateMatrixCache', {})
     this.userItemMatrixCache = null
   }
 
@@ -373,6 +456,7 @@ class CollaborativeFilteringService {
    * Xóa cache similarity của một user cụ thể.
    */
   invalidateUserSimilarityCache(userId: string): void {
+    recoLog('CF', 'invalidateUserSimilarityCache', { userId })
     this.similarityCache.delete(userId)
   }
 }
