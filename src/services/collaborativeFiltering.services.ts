@@ -24,11 +24,12 @@ const TOP_K_USERS = 50
 const MIN_COMMON_ITEMS = 5
 
 class CollaborativeFilteringService {
-  // Cache ma trận User-Item (TTL: 6 giờ)
-  private userItemMatrixCache: {
-    matrix: Map<string, Map<string, number>>
-    expiredAt: number
-  } | null
+  // Cache ma trận User-Item theo từng user (TTL: 6 giờ)
+  // Mỗi user có một ma trận riêng chỉ chứa những user liên quan (đã tương tác bài chung)
+  private userItemMatrixCache: Map<
+    string,
+    { matrix: Map<string, Map<string, number>>; expiredAt: number }
+  >
 
   // Cache user similarity (TTL: 6 giờ)
   private similarityCache: Map<
@@ -40,7 +41,7 @@ class CollaborativeFilteringService {
   private readonly SIMILARITY_TTL = 6 * 60 * 60 * 1000 // 6 giờ
 
   constructor() {
-    this.userItemMatrixCache = null
+    this.userItemMatrixCache = new Map()
     this.similarityCache = new Map()
   }
 
@@ -52,7 +53,7 @@ class CollaborativeFilteringService {
     recoLog('CF', 'Bắt đầu getRecommendations', { userId, limit })
 
     // Xây dựng ma trận User-Item
-    const userItemMatrix = await this.getOrBuildUserItemMatrix()
+    const userItemMatrix = await this.getOrBuildUserItemMatrix(userId)
     if (userItemMatrix.size === 0) {
       recoLog('CF', 'Dừng: ma trận User-Item rỗng', { userId })
       return []
@@ -136,66 +137,135 @@ class CollaborativeFilteringService {
 
   /**
    * Xây dựng hoặc lấy từ cache ma trận User-Item.
+   * CHỈ tải dữ liệu của những user liên quan (đã tương tác ít nhất 1 bài chung với user hiện tại).
    * Giá trị = raw_rating = w_like*like + w_comment*comment + w_quote*quote
    */
-  private async getOrBuildUserItemMatrix(): Promise<Map<string, Map<string, number>>> {
-    if (this.userItemMatrixCache && this.userItemMatrixCache.expiredAt > Date.now()) {
+  private async getOrBuildUserItemMatrix(userId: string): Promise<Map<string, Map<string, number>>> {
+    // Kiểm tra cache theo userId
+    const cached = this.userItemMatrixCache.get(userId)
+    if (cached && cached.expiredAt > Date.now()) {
       recoLog('CF', 'getOrBuildUserItemMatrix: dùng cache', {
-        sốUser: this.userItemMatrixCache.matrix.size,
-        ttlCòn_ms: this.userItemMatrixCache.expiredAt - Date.now()
+        userId,
+        sốUser: cached.matrix.size,
+        ttlCòn_ms: cached.expiredAt - Date.now()
       })
-      return this.userItemMatrixCache.matrix
+      return cached.matrix
     }
 
-    recoLog('CF', 'getOrBuildUserItemMatrix: build mới (likes + comments + quotes)', {})
+    recoLog('CF', 'getOrBuildUserItemMatrix: build mới (chỉ user liên quan)', { userId })
 
+    // ====== BƯỚC 0: Tìm các bài viết mà user hiện tại đã tương tác ======
+    const userObjectId = new ObjectId(userId)
+    const [myLikes, myComments, myQuotes] = await Promise.all([
+      databaseService.likes.find({ user_id: userObjectId }, { projection: { twizz_id: 1 } }).toArray(),
+      databaseService.twizzs.find(
+        { user_id: userObjectId, type: TwizzType.Comment, parent_id: { $ne: null } },
+        { projection: { parent_id: 1 } }
+      ).toArray(),
+      databaseService.twizzs.find(
+        { user_id: userObjectId, type: TwizzType.QuoteTwizz, parent_id: { $ne: null } },
+        { projection: { parent_id: 1 } }
+      ).toArray()
+    ])
+
+    // Gộp tất cả twizz_id mà user đã tương tác
+    const myTwizzIds = new Set<string>()
+    myLikes.forEach((l) => myTwizzIds.add(l.twizz_id.toString()))
+    myComments.forEach((c) => { if (c.parent_id) myTwizzIds.add(c.parent_id.toString()) })
+    myQuotes.forEach((q) => { if (q.parent_id) myTwizzIds.add(q.parent_id.toString()) })
+
+    if (myTwizzIds.size === 0) {
+      recoLog('CF', 'getOrBuildUserItemMatrix: user chưa tương tác bài nào', { userId })
+      return new Map()
+    }
+
+    const myTwizzObjectIds = [...myTwizzIds].map((id) => new ObjectId(id))
+
+    // ====== BƯỚC 1: Tìm "user liên quan" = ai đã tương tác ít nhất 1 bài chung ======
+    const [relevantFromLikes, relevantFromInteractions] = await Promise.all([
+      // User nào cũng LIKE ít nhất 1 bài giống tôi?
+      databaseService.likes.distinct('user_id', { twizz_id: { $in: myTwizzObjectIds } }),
+      // User nào cũng COMMENT hoặc QUOTE ít nhất 1 bài giống tôi?
+      databaseService.twizzs.distinct('user_id', {
+        parent_id: { $in: myTwizzObjectIds },
+        type: { $in: [TwizzType.Comment, TwizzType.QuoteTwizz] }
+      })
+    ])
+
+    // Gộp lại thành danh sách user liên quan (bao gồm cả chính mình)
+    const relevantUserIds = new Set<string>()
+    relevantUserIds.add(userId)
+    relevantFromLikes.forEach((id: ObjectId) => relevantUserIds.add(id.toString()))
+    relevantFromInteractions.forEach((id: ObjectId) => relevantUserIds.add(id.toString()))
+
+    const relevantUserObjectIds = [...relevantUserIds].map((id) => new ObjectId(id))
+
+    recoLog('CF', 'getOrBuildUserItemMatrix: tìm được user liên quan', {
+      userId,
+      sốBàiĐãTươngTác: myTwizzIds.size,
+      sốUserLiênQuan: relevantUserIds.size,
+      từLikes: relevantFromLikes.length,
+      từCommentQuote: relevantFromInteractions.length
+    })
+
+    // ====== BƯỚC 2: Chỉ tải tương tác của nhóm user liên quan ======
     const matrix = new Map<string, Map<string, number>>()
 
-    // Thu thập likes
-    const likes = await databaseService.likes.find({}, { projection: { user_id: 1, twizz_id: 1 } }).toArray()
+    // Thu thập likes (CHỈ của user liên quan)
+    const likes = await databaseService.likes
+      .find({ user_id: { $in: relevantUserObjectIds } }, { projection: { user_id: 1, twizz_id: 1 } })
+      .toArray()
 
     for (const like of likes) {
-      const userId = like.user_id.toString()
+      const uid = like.user_id.toString()
       const twizzId = like.twizz_id.toString()
-      if (!matrix.has(userId)) matrix.set(userId, new Map())
-      const userRow = matrix.get(userId)!
+      if (!matrix.has(uid)) matrix.set(uid, new Map())
+      const userRow = matrix.get(uid)!
       userRow.set(twizzId, (userRow.get(twizzId) ?? 0) + RATING_WEIGHTS.like)
     }
 
-    // Thu thập comments
+    // Thu thập comments (CHỈ của user liên quan)
     const comments = await databaseService.twizzs
-      .find({ type: TwizzType.Comment, parent_id: { $ne: null } }, { projection: { user_id: 1, parent_id: 1 } })
+      .find(
+        { user_id: { $in: relevantUserObjectIds }, type: TwizzType.Comment, parent_id: { $ne: null } },
+        { projection: { user_id: 1, parent_id: 1 } }
+      )
       .toArray()
 
     for (const comment of comments) {
       if (!comment.parent_id) continue
-      const userId = comment.user_id.toString()
+      const uid = comment.user_id.toString()
       const twizzId = comment.parent_id.toString()
-      if (!matrix.has(userId)) matrix.set(userId, new Map())
-      const userRow = matrix.get(userId)!
+      if (!matrix.has(uid)) matrix.set(uid, new Map())
+      const userRow = matrix.get(uid)!
       userRow.set(twizzId, (userRow.get(twizzId) ?? 0) + RATING_WEIGHTS.comment)
     }
 
-    // Thu thập quotes
+    // Thu thập quotes (CHỈ của user liên quan)
     const quotes = await databaseService.twizzs
-      .find({ type: TwizzType.QuoteTwizz, parent_id: { $ne: null } }, { projection: { user_id: 1, parent_id: 1 } })
+      .find(
+        { user_id: { $in: relevantUserObjectIds }, type: TwizzType.QuoteTwizz, parent_id: { $ne: null } },
+        { projection: { user_id: 1, parent_id: 1 } }
+      )
       .toArray()
 
     for (const quote of quotes) {
       if (!quote.parent_id) continue
-      const userId = quote.user_id.toString()
+      const uid = quote.user_id.toString()
       const twizzId = quote.parent_id.toString()
-      if (!matrix.has(userId)) matrix.set(userId, new Map())
-      const userRow = matrix.get(userId)!
+      if (!matrix.has(uid)) matrix.set(uid, new Map())
+      const userRow = matrix.get(uid)!
       userRow.set(twizzId, (userRow.get(twizzId) ?? 0) + RATING_WEIGHTS.quote)
     }
 
-    this.userItemMatrixCache = { matrix, expiredAt: Date.now() + this.MATRIX_TTL }
+    // Lưu cache theo userId
+    this.userItemMatrixCache.set(userId, { matrix, expiredAt: Date.now() + this.MATRIX_TTL })
 
     let totalCells = 0
     for (const row of matrix.values()) totalCells += row.size
 
     recoLog('CF', 'getOrBuildUserItemMatrix: hoàn tất', {
+      userId,
       sốUser: matrix.size,
       tổngÔUserItem: totalCells,
       likes: likes.length,
@@ -253,9 +323,6 @@ class CollaborativeFilteringService {
       MIN_COMMON_ITEMS
     })
 
-    // Vector đã normalize (mean offset) của user hiện tại
-    const normalizedUserVec = this.meanOffsetNormalize(userRow, userMean)
-
     const similarities: Array<{ userId: string; similarity: number; mean: number }> = []
 
     for (const [otherUserId, otherRow] of matrix.entries()) {
@@ -267,12 +334,18 @@ class CollaborativeFilteringService {
       if (commonItems.length < MIN_COMMON_ITEMS) continue
 
       const otherMean = this.computeMean(otherRow)
-      const normalizedOtherVec = this.meanOffsetNormalize(otherRow, otherMean)
+      // Tính Cosine Similarity trên điểm số thực tế (Raw Ratings) 
+      // để đảm bảo hễ cùng thích là có độ tương đồng dương
+      const similarity = this.cosineSimilarityOnCommon(userRow, otherRow, commonItems)
 
-      // Tính Cosine Similarity chỉ trên common items
-      const similarity = this.cosineSimilarityOnCommon(normalizedUserVec, normalizedOtherVec, commonItems)
+      if (otherRow.size > 0) {
+        recoLog('CF', `So sánh với user ${otherUserId}`, {
+          commonCount: commonItems.length,
+          similarity: similarity
+        })
+      }
 
-      if (similarity > 0) {
+      if (similarity > 0.1) { // Ngưỡng similarity dương thực sự
         similarities.push({ userId: otherUserId, similarity, mean: otherMean })
       }
     }
@@ -465,7 +538,7 @@ class CollaborativeFilteringService {
    */
   invalidateMatrixCache(): void {
     recoLog('CF', 'invalidateMatrixCache', {})
-    this.userItemMatrixCache = null
+    this.userItemMatrixCache.clear()
   }
 
   /**

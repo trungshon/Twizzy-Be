@@ -16,6 +16,7 @@ interface TwizzConstructor {
   user_views?: number
   created_at?: Date
   updated_at?: Date
+  content_vector?: number[]
 }
 
 export default class Twizz {
@@ -32,6 +33,7 @@ export default class Twizz {
   user_views: number
   created_at: Date
   updated_at: Date
+  content_vector?: number[] // Vector 384 chiều biểu diễn ý nghĩa bài viết
 
   constructor({
     _id,
@@ -46,7 +48,8 @@ export default class Twizz {
     user_id,
     user_views,
     created_at,
-    updated_at
+    updated_at,
+    content_vector
   }: TwizzConstructor) {
     const date = new Date()
     this._id = _id
@@ -62,5 +65,6 @@ export default class Twizz {
     this.user_views = user_views || 0
     this.created_at = created_at || date
     this.updated_at = updated_at || date
+    this.content_vector = content_vector // Lưu vector nếu có
   }
 }

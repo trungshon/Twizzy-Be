@@ -10,6 +10,7 @@ import { HTTP_STATUS } from '~/constants/httpStatus'
 import { ErrorWithStatus } from '~/models/Errors'
 import { TWIZZ_MESSAGES } from '~/constants/messages'
 import recommendationService from './recommendations.services'
+import embeddingService from './embedding.services'
 
 class TwizzsService {
   async checkAndCreateHashtags(hashtags: string[]) {
@@ -27,6 +28,11 @@ class TwizzsService {
   }
   async createTwizz(user_id: string, body: TwizzReqBody) {
     const hashtags = await this.checkAndCreateHashtags(body.hashtags)
+    
+    // Tạo vector cho nội dung bài viết (bao gồm cả text và hashtags)
+    const contentForEmbedding = `${body.content} ${body.hashtags.join(' ')}`
+    const content_vector = await embeddingService.generateEmbedding(contentForEmbedding)
+
     const result = await databaseService.twizzs.insertOne(
       new Twizz({
         audience: body.audience,
@@ -39,7 +45,8 @@ class TwizzsService {
         user_id: new ObjectId(user_id),
         user_views: 0,
         created_at: new Date(),
-        updated_at: new Date()
+        updated_at: new Date(),
+        content_vector: content_vector // Lưu vector vào DB
       })
     )
     // Populate user info and other data using aggregation

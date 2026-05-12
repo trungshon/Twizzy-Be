@@ -29,6 +29,7 @@ interface UserType {
   role?: UserRole
   violation_count?: number
   fcm_tokens?: string[] // FCM token cho push notification
+  interest_vector?: number[]
 }
 
 export default class User {
@@ -59,6 +60,7 @@ export default class User {
   role: UserRole
   violation_count: number
   fcm_tokens: string[]
+  interest_vector?: number[] // Vector 384 chiều biểu diễn sở thích người dùng
 
   constructor(user: UserType) {
     const date = new Date()
@@ -88,6 +90,7 @@ export default class User {
     this.role = user.role ?? UserRole.User
     this.violation_count = user.violation_count || 0
     this.fcm_tokens = user.fcm_tokens || []
+    this.interest_vector = user.interest_vector // Lưu vector nếu có
   }
 }
 
