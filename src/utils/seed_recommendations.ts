@@ -543,10 +543,10 @@ async function main() {
   const userColdNoFollow = await createUser('cold_no_follow')
   const userColdFollow = await createUser('cold_follow')
   const userContentOnly = await createUser('content_only')
-  const userHybrid = await createUser('hybrid')
-  const userHybridFallback = await createUser('hybrid_fallback')
+  const userContentActive = await createUser('content_active')
+  const userContentNiche = await createUser('content_niche')
   const bgUsers: ObjectId[] = []
-  for (let i = 1; i <= 30; i++) bgUsers.push(await createUser(`bg_${i}`))
+  for (let i = 1; i <= 20; i++) bgUsers.push(await createUser(`bg_${i}`))
 
   console.log('[seed] Generating 220 posts with hashtags & vectors...')
   const twizzDocs: Twizz[] = []
@@ -563,8 +563,8 @@ async function main() {
   }
   await databaseService.twizzs.insertMany(twizzDocs)
 
-  console.log('[seed] Setup test interactions (Strong Overlap for CF)...')
-  // Cold Follow
+  console.log('[seed] Setup test interactions...')
+  // Cold Follow: follow 3 bg users
   await Promise.all(bgUsers.slice(0, 3).map(id => databaseService.followers.insertOne(new Follower({ user_id: userColdFollow, followed_user_id: id, created_at: new Date() }))))
 
   // 1. Kho bài viết cho các chủ đề test
@@ -573,44 +573,38 @@ async function main() {
   const financePosts = twizzPool.filter(p => p.topic === 'finance')
   const healthPosts = twizzPool.filter(p => p.topic === 'health')
 
-  // 2. User Hybrid: Thích cả Tech và Cooking (Đa sở thích)
+  // 2. User Content Active: Thích cả Tech và Cooking (Đa sở thích, nhiều tương tác)
   for (const p of techPosts.slice(0, 12)) {
-    await databaseService.likes.insertOne(new Like({ user_id: userHybrid, twizz_id: p._id, created_at: new Date() }))
+    await databaseService.likes.insertOne(new Like({ user_id: userContentActive, twizz_id: p._id, created_at: new Date() }))
   }
   for (const p of cookPosts.slice(0, 10)) {
-    await databaseService.likes.insertOne(new Like({ user_id: userHybrid, twizz_id: p._id, created_at: new Date() }))
-    if (Math.random() > 0.5) await createComment(userHybrid, p._id)
+    await databaseService.likes.insertOne(new Like({ user_id: userContentActive, twizz_id: p._id, created_at: new Date() }))
+    if (Math.random() > 0.5) await createComment(userContentActive, p._id)
   }
 
-  // 3. NHÓM ĐỒNG ĐIỆU A (Fan Tech): Cùng thích Tech, gợi ý Tài chính
+  // 3. Nhóm BG thích Tech → tạo trending cho bài Tech + Finance
   const groupTech = bgUsers.slice(0, 5)
   for (const bgId of groupTech) {
-    // Overlap Tech
     for (const p of faker.helpers.arrayElements(techPosts.slice(0, 12), 8)) {
       await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
     }
-    // Gợi ý Tài chính (Discovery 1)
     for (const p of financePosts.slice(0, 8)) {
       await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
-      if (Math.random() > 0.4) await createComment(bgId, p._id)
     }
   }
 
-  // 4. NHÓM ĐỒNG ĐIỆU B (Fan Cooking): Cùng thích Nấu ăn, gợi ý Sức khỏe
+  // 4. Nhóm BG thích Cooking → tạo trending cho bài Cooking + Health
   const groupCook = bgUsers.slice(5, 10)
   for (const bgId of groupCook) {
-    // Overlap Cooking
     for (const p of faker.helpers.arrayElements(cookPosts.slice(0, 10), 7)) {
       await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
     }
-    // Gợi ý Sức khỏe (Discovery 2)
     for (const p of healthPosts.slice(0, 8)) {
       await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
-      if (Math.random() > 0.4) await createComment(bgId, p._id)
     }
   }
 
-  // 4. Các tương tác khác để tạo Trending
+  // 5. Các tương tác khác để tạo Trending đa dạng
   const remainingPosts = twizzPool.slice(15, 40)
   for (const bg of bgUsers.slice(10, 20)) {
     for (const post of faker.helpers.arrayElements(remainingPosts, 3)) {
@@ -618,11 +612,11 @@ async function main() {
     }
   }
 
-  // Content Only (Football)
+  // Content Only (Football) — ít tương tác, chỉ 5 like
   const fbPosts = twizzPool.filter(p => p.topic === 'football').slice(0, 5)
   for (const p of fbPosts) await databaseService.likes.insertOne(new Like({ user_id: userContentOnly, twizz_id: p._id, created_at: new Date() }))
 
-  // Hybrid Fallback (Astronomy)
+  // Content Niche (Astronomy) — user thích chủ đề hiếm
   console.log('[seed] Creating niche pool (Astronomy)...')
   const nicheAuthor = bgUsers[bgUsers.length - 1]
   const nicheDocs: Twizz[] = []
@@ -630,8 +624,8 @@ async function main() {
     const t = await createTwizz(nicheAuthor, 'astronomy')
     nicheDocs.push(t)
     if (i < 15) {
-      if (i < 10) await databaseService.likes.insertOne(new Like({ user_id: userHybridFallback, twizz_id: t._id as ObjectId, created_at: new Date() }))
-      else await createComment(userHybridFallback, t._id as ObjectId)
+      if (i < 10) await databaseService.likes.insertOne(new Like({ user_id: userContentNiche, twizz_id: t._id as ObjectId, created_at: new Date() }))
+      else await createComment(userContentNiche, t._id as ObjectId)
     }
   }
   await databaseService.twizzs.insertMany(nicheDocs)

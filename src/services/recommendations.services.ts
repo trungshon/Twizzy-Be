@@ -1,7 +1,6 @@
 import { ObjectId } from 'mongodb'
 import databaseService from './database.services'
-import contentBasedService from './contentBased.services'
-import collaborativeFilteringService from './collaborativeFiltering.services'
+import contentBasedService, { ContentBasedResult } from './contentBased.services'
 import { TwizzType, TwizzAudience } from '~/constants/enum'
 import { recoLog } from '~/utils/recommendationLogger'
 
@@ -10,14 +9,13 @@ interface ScoredItem {
   twizz_id: ObjectId
   score: number
   reason: string
-  algorithm: 'content' | 'collaborative' | 'hybrid' | 'trending' | 'following'
+  algorithm: 'content' | 'trending' | 'following'
 }
 
 // Metadata về kết quả gợi ý
 interface RecommendationMeta {
   total_recommended: number
   content_based_count: number
-  collaborative_count: number
   trending_count: number
   following_count: number
   processing_time_ms: number
@@ -38,19 +36,11 @@ export interface PaginatedRecommendations {
   metadata: RecommendationMeta
 }
 
-// Ngưỡng tương tác hiệu dụng để bật Hybrid
-const EFFECTIVE_INTERACTION_THRESHOLD = 15
-// Số bài khác nhau tối thiểu đã tương tác
-const MIN_DISTINCT_TWIZZ = 8
-
 // Trọng số tính effective_interactions (nhất quán với contentBased.services.ts)
 const EFFECTIVE_WEIGHTS = { like: 1.0, comment: 1.2, quote: 1.5 }
 
-// Trọng số Hybrid (Content-Based : Collaborative = 60 : 40)
-const HYBRID_WEIGHTS = { content: 0.6, collaborative: 0.4 }
-
-// Trọng số khi không tìm được users tương tự
-const FALLBACK_WEIGHTS = { content: 0.8, trending: 0.2 }
+// Tỉ lệ xen kẽ chính:phụ trên mỗi trang (70% : 30%)
+const PRIMARY_RATIO = 0.7
 
 // Trọng số Cold Start khi có follow
 const COLD_START_FOLLOW_WEIGHTS = { following: 0.7, trending: 0.3 }
@@ -63,9 +53,6 @@ const TRENDING_DAYS = 7
 
 // Số bài tối đa trong pool gợi ý (để phân trang)
 const RECOMMENDATION_POOL_SIZE = 60
-
-import { ContentBasedResult } from './contentBased.services'
-import { CollaborativeResult } from './collaborativeFiltering.services'
 
 class RecommendationService {
   // Cache danh sách scored IDs cho mỗi user (TTL: 30 phút)
@@ -125,32 +112,20 @@ class RecommendationService {
     }
 
     // Tính chỉ số tương tác để chọn chiến lược
-    const { effectiveCount, distinctTwizzCount } = await this.computeEffectiveInteractions(userId)
+    const { effectiveCount } = await this.computeEffectiveInteractions(userId)
 
-    recoLog('Orchestrator', 'Chỉ số cold start / hybrid', {
-      effectiveCount,
-      distinctTwizzCount,
-      ngưỡngEffective: EFFECTIVE_INTERACTION_THRESHOLD,
-      ngưỡngDistinctTwizz: MIN_DISTINCT_TWIZZ
-    })
+    recoLog('Orchestrator', 'Chỉ số tương tác', { effectiveCount })
 
     let internalResult: InternalResult
 
     if (effectiveCount === 0) {
-      // Trường hợp 1: Chưa có tương tác nào -> Cold Start
+      // Chưa có tương tác nào → Cold Start (Following 70% + Trending 30%)
       recoLog('Orchestrator', 'Chiến lược: Cold Start (chưa có tương tác)', { userId })
-      internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, startTime)
-    } else if (effectiveCount < EFFECTIVE_INTERACTION_THRESHOLD || distinctTwizzCount < MIN_DISTINCT_TWIZZ) {
-      // Trường hợp 2: Ít tương tác -> Content-Based only
-      recoLog('Orchestrator', 'Chiến lược: Content-Based only (+ trending nếu thiếu)', {
-        userId,
-        lýDo: effectiveCount < EFFECTIVE_INTERACTION_THRESHOLD ? 'effective < ngưỡng' : 'distinct_twizz < ngưỡng'
-      })
-      internalResult = await this.contentBasedOnlyRecommendations(userId, RECOMMENDATION_POOL_SIZE, startTime)
+      internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, startTime)
     } else {
-      // Trường hợp 3: Đủ tương tác -> Hybrid
-      recoLog('Orchestrator', 'Chiến lược: Hybrid (Content + Collaborative)', { userId })
-      internalResult = await this.hybridRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, startTime)
+      // Có tương tác → Content-Based 70% + Trending 30%
+      recoLog('Orchestrator', 'Chiến lược: Content + Trending (70:30)', { userId, effectiveCount })
+      internalResult = await this.contentTrendingRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, startTime)
     }
 
     // Lưu cache scored items của pool mới
@@ -573,20 +548,27 @@ class RecommendationService {
 
   /**
    * Cold Start: user chưa có tương tác nào.
+   * Following (70%) + Trending (30%) per page, slot-filling.
    */
-  private async coldStartRecommendations(userId: string, limit: number, startTime: number): Promise<InternalResult> {
+  private async coldStartRecommendations(
+    userId: string,
+    poolSize: number,
+    pageLimit: number,
+    startTime: number
+  ): Promise<InternalResult> {
     const followingCount = await databaseService.followers.countDocuments({
       user_id: new ObjectId(userId)
     })
 
-    recoLog('Orchestrator', 'coldStartRecommendations: số người đang follow', { userId, followingCount, limit })
+    recoLog('Orchestrator', 'coldStartRecommendations', { userId, followingCount, poolSize })
 
     let followingItems: ScoredItem[] = []
     let trendingItems: ScoredItem[] = []
 
     if (followingCount > 0) {
-      const followingLimit = Math.ceil(limit * COLD_START_FOLLOW_WEIGHTS.following)
-      const trendingLimit = limit - followingLimit
+      // Lấy following (70% pool) và trending (30% pool)
+      const followingLimit = Math.ceil(poolSize * COLD_START_FOLLOW_WEIGHTS.following)
+      const trendingLimit = poolSize - followingLimit
 
       recoLog('Orchestrator', 'Cold Start: user có follow → following + trending', {
         userId,
@@ -596,39 +578,68 @@ class RecommendationService {
       })
 
       followingItems = await this.getFollowingTwizzs(userId, followingLimit)
-      trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, new Set())
+      const excludeIds = new Set(followingItems.map((t) => t.twizz_id.toString()))
+      trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, excludeIds)
+
+      // Xen kẽ 70:30 per page (14 following + 6 trending)
+      const interleaved = this.interleaveResults(followingItems, trendingItems, pageLimit, poolSize)
+
+      recoLog('Orchestrator', 'Cold Start: sau interleave', {
+        userId,
+        following_raw: followingItems.length,
+        trending_raw: trendingItems.length,
+        sauInterleave: interleaved.length
+      })
+
+      return this.buildInternalResult(
+        interleaved,
+        { following: followingItems.length, trending: trendingItems.length },
+        startTime
+      )
     } else {
-      recoLog('Orchestrator', 'Cold Start: user không follow ai → chỉ trending', { userId, limit })
-      trendingItems = await this.getTrendingTwizzs(userId, limit, new Set())
+      // Không follow ai → chỉ trending
+      recoLog('Orchestrator', 'Cold Start: user không follow ai → chỉ trending', { userId, poolSize })
+      trendingItems = await this.getTrendingTwizzs(userId, poolSize, new Set())
+
+      const deduplicated = this.deduplicateAndDiversify(trendingItems, poolSize)
+
+      recoLog('Orchestrator', 'Cold Start: sau dedupe (chỉ trending)', {
+        userId,
+        trending_raw: trendingItems.length,
+        sauDedupe: deduplicated.length
+      })
+
+      return this.buildInternalResult(
+        deduplicated,
+        { trending: trendingItems.length },
+        startTime
+      )
     }
-
-    const combined = [...followingItems, ...trendingItems]
-    const deduplicated = this.deduplicateAndDiversify(combined, limit)
-
-    recoLog('Orchestrator', 'Cold Start: sau dedupe', {
-      userId,
-      following_raw: followingItems.length,
-      trending_raw: trendingItems.length,
-      sauDedupe: deduplicated.length
-    })
-
-    return this.buildInternalResult(
-      deduplicated,
-      { trending: trendingItems.length, following: followingItems.length },
-      startTime
-    )
   }
 
   /**
-   * Content-Based only: user có ít tương tác.
+   * Content + Trending: user đã có tương tác (effectiveCount > 0).
+   * Content-Based (70%) + Trending (30%) per page, slot-filling.
    */
-  private async contentBasedOnlyRecommendations(
+  private async contentTrendingRecommendations(
     userId: string,
-    limit: number,
+    poolSize: number,
+    pageLimit: number,
     startTime: number
   ): Promise<InternalResult> {
-    recoLog('Orchestrator', 'Content-only: gọi Content-Based', { userId, limit })
-    const contentResults = await contentBasedService.getRecommendations(userId, limit)
+    // Lấy content (70% pool) và trending (30% pool)
+    const contentLimit = Math.ceil(poolSize * PRIMARY_RATIO)
+    const trendingLimit = poolSize - contentLimit
+
+    recoLog('Orchestrator', 'Content+Trending: gọi song song', {
+      userId,
+      poolSize,
+      pageLimit,
+      contentLimit,
+      trendingLimit
+    })
+
+    const contentResults = await contentBasedService.getRecommendations(userId, contentLimit)
 
     const contentItems: ScoredItem[] = contentResults.map((r) => ({
       twizz_id: r.twizz_id,
@@ -637,178 +648,77 @@ class RecommendationService {
       algorithm: 'content' as const
     }))
 
-    let trendingItems: ScoredItem[] = []
+    // Trending lấy thêm, loại trùng với content
+    const excludeIds = new Set(contentItems.map((t) => t.twizz_id.toString()))
+    const trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, excludeIds)
 
-    if (contentItems.length < limit) {
-      const remaining = limit - contentItems.length
-      const excludeIds = new Set(contentItems.map((t) => t.twizz_id.toString()))
-      recoLog('Orchestrator', 'Content-only: thiếu bài → bổ sung trending', {
-        userId,
-        contentCount: contentItems.length,
-        remaining
-      })
-      trendingItems = await this.getTrendingTwizzs(userId, remaining, excludeIds)
-    }
-
-    const combined = [...contentItems, ...trendingItems]
-    const deduplicated = this.deduplicateAndDiversify(combined, limit)
-
-    recoLog('Orchestrator', 'Content-only: sau dedupe', {
+    recoLog('Orchestrator', 'Content+Trending: kết quả thô', {
       userId,
-      content_raw: contentItems.length,
-      trending_raw: trendingItems.length,
-      sauDedupe: deduplicated.length
+      contentCount: contentItems.length,
+      trendingCount: trendingItems.length
     })
 
-    return this.buildInternalResult(
-      deduplicated,
-      { content: contentItems.length, trending: trendingItems.length },
-      startTime
-    )
-  }
+    // Xen kẽ 70:30 per page (14 content + 6 trending)
+    const interleaved = this.interleaveResults(contentItems, trendingItems, pageLimit, poolSize)
 
-  /**
-   * Hybrid: kết hợp Content-Based (70%) và Collaborative (30%).
-   */
-  private async hybridRecommendations(userId: string, poolSize: number, pageLimit: number, startTime: number): Promise<InternalResult> {
-    // Giới hạn Content-Based để "nhường chỗ" cho CF
-    // Nếu pool = 60 bài → Content lấy tối đa 40, CF lấy tối đa 60
-    const contentLimit = Math.ceil(poolSize * 0.65)
-    const collabLimit = poolSize
-
-    recoLog('Orchestrator', 'Hybrid: song song Content-Based + CF', {
-      userId,
-      poolSize,
-      pageLimit,
-      contentLimit,
-      collabLimit
-    })
-    const [contentResults, collaborativeResults] = await Promise.all([
-      contentBasedService.getRecommendations(userId, contentLimit),
-      collaborativeFilteringService.getRecommendations(userId, collabLimit)
-    ])
-
-    recoLog('Orchestrator', 'Hybrid: kết quả thô từ 2 nhánh', {
-      userId,
-      contentCount: contentResults.length,
-      collaborativeCount: collaborativeResults.length
-    })
-
+    // Đếm lại số lượng từ mỗi nguồn sau khi interleave
     let contentCount = 0
-    let collaborativeCount = 0
-
-    // Fallback khi không tìm được similar users
-    if (collaborativeResults.length === 0) {
-      recoLog('Orchestrator', 'Hybrid: CF rỗng → fallback content + trending', { userId })
-      const contentItems: ScoredItem[] = contentResults.map((r) => ({
-        twizz_id: r.twizz_id,
-        score: r.score * FALLBACK_WEIGHTS.content,
-        reason: r.reason,
-        algorithm: 'content' as const
-      }))
-
-      const excludeIds = new Set(contentItems.map((t) => t.twizz_id.toString()))
-      const trendingLimit = Math.ceil(poolSize * FALLBACK_WEIGHTS.trending)
-      const trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, excludeIds)
-
-      const combined = [...contentItems, ...trendingItems]
-      const deduplicated = this.deduplicateAndDiversify(combined, poolSize)
-
-      recoLog('Orchestrator', 'Hybrid fallback: sau dedupe', {
-        userId,
-        sauDedupe: deduplicated.length
-      })
-
-      return this.buildInternalResult(
-        deduplicated,
-        { content: contentItems.length, trending: trendingItems.length },
-        startTime
-      )
-    }
-
-    // Thực hiện xen kẽ 65% Content : 35% Collaborative trên từng trang
-    // pageLimit = kích thước trang thực tế (20), không phải poolSize (60)
-    const hybridDeduplicated = this.interleaveHybridResults(contentResults, collaborativeResults, pageLimit)
-
-    // Đếm lại số lượng từ mỗi nguồn sau khi đã xen kẽ và lọc trùng
-    contentCount = 0
-    collaborativeCount = 0
-    hybridDeduplicated.forEach((item) => {
-      if (item.algorithm === 'content' || item.algorithm === 'hybrid') contentCount++
-      if (item.algorithm === 'collaborative' || item.algorithm === 'hybrid') collaborativeCount++
+    let trendingCount = 0
+    interleaved.forEach((item) => {
+      if (item.algorithm === 'content') contentCount++
+      if (item.algorithm === 'trending') trendingCount++
     })
 
-    recoLog('Orchestrator', 'Hybrid: sau xen kẽ (Slot-based 65:35)', {
+    recoLog('Orchestrator', 'Content+Trending: sau interleave (70:30)', {
       userId,
-      sauDedupe: hybridDeduplicated.length,
+      sauInterleave: interleaved.length,
       contentCount,
-      collaborativeCount
+      trendingCount
     })
 
     return this.buildInternalResult(
-      hybridDeduplicated,
-      { content: contentCount, collaborative: collaborativeCount },
+      interleaved,
+      { content: contentCount, trending: trendingCount },
       startTime
     )
   }
 
   /**
-   * Xen kẽ kết quả theo tỉ lệ 65% Content : 35% Collab trên từng trang (Slot-filling)
-   * @param pageLimit Kích thước trang thực tế (VD: 20), dùng để tính số slot Content/Collab mỗi trang
+   * Xen kẽ 2 nguồn bài theo tỉ lệ 70:30 trên từng trang (Slot-filling).
+   *
+   * @param primaryItems  Nguồn chính (Content hoặc Following)
+   * @param secondaryItems Nguồn phụ (Trending)
+   * @param pageLimit     Kích thước trang thực tế (VD: 20)
+   * @param maxPool       Số bài tối đa trong pool (VD: 60)
    */
-  private interleaveHybridResults(
-    contentItems: ContentBasedResult[],
-    collabItems: CollaborativeResult[],
-    pageLimit: number
+  private interleaveResults(
+    primaryItems: ScoredItem[],
+    secondaryItems: ScoredItem[],
+    pageLimit: number,
+    maxPool: number
   ): ScoredItem[] {
     const finalPool: ScoredItem[] = []
-    const MAX_POOL = 60
 
-    // Tỉ lệ mỗi trang thực tế (pageLimit=20 -> 13 Content, 7 Collab)
-    const contentPerPage = Math.ceil(pageLimit * 0.65)
-    const collabPerPage = pageLimit - contentPerPage
+    // Tỉ lệ mỗi trang (pageLimit=20 → 14 primary, 6 secondary)
+    const primaryPerPage = Math.ceil(pageLimit * PRIMARY_RATIO)
+    const secondaryPerPage = pageLimit - primaryPerPage
 
-    // Lọc trùng: Nếu bài xuất hiện ở cả 2, ta coi nó là 'hybrid' và ưu tiên đưa vào hàng đợi Content
-    // SỬ DỤNG SCORE GỐC từ Vector Search (Cosine Similarity) và CF (Predicted Rating)
-    const contentQueue: ScoredItem[] = contentItems.map((item) => {
-      const collabMatch = collabItems.find((c) => c.twizz_id.toString() === item.twizz_id.toString())
-      // Score gốc × trọng số Hybrid, cộng thêm CF score nếu trùng
-      const contentScore = item.score * HYBRID_WEIGHTS.content
-      const collabScore = collabMatch ? collabMatch.score * HYBRID_WEIGHTS.collaborative : 0
-
-      return {
-        twizz_id: item.twizz_id,
-        score: contentScore + collabScore,
-        algorithm: collabMatch ? ('hybrid' as const) : ('content' as const),
-        reason: collabMatch ? 'Phù hợp sở thích và được nhiều người cùng gu yêu thích' : item.reason
-      }
-    })
-
-    const collabQueue: ScoredItem[] = collabItems
-      .filter((ci) => !contentItems.find((ui) => ui.twizz_id.toString() === ci.twizz_id.toString()))
-      .map((item) => ({
-        twizz_id: item.twizz_id,
-        score: item.score * HYBRID_WEIGHTS.collaborative,
-        algorithm: 'collaborative' as const,
-        reason: 'Được những người có sở thích tương đồng với bạn yêu thích'
-      }))
-
-    let cIdx = 0
-    let colIdx = 0
+    let pIdx = 0
+    let sIdx = 0
 
     // Điền vào pool theo từng "trang" ảo
-    while (finalPool.length < MAX_POOL && (cIdx < contentQueue.length || colIdx < collabQueue.length)) {
-      // 1. Fill Content slots cho trang hiện tại
-      for (let i = 0; i < contentPerPage && finalPool.length < MAX_POOL; i++) {
-        if (cIdx < contentQueue.length) finalPool.push(contentQueue[cIdx++])
+    while (finalPool.length < maxPool && (pIdx < primaryItems.length || sIdx < secondaryItems.length)) {
+      // 1. Fill Primary slots cho trang hiện tại
+      for (let i = 0; i < primaryPerPage && finalPool.length < maxPool; i++) {
+        if (pIdx < primaryItems.length) finalPool.push(primaryItems[pIdx++])
       }
-      // 2. Fill Collab slots cho trang hiện tại
-      for (let i = 0; i < collabPerPage && finalPool.length < MAX_POOL; i++) {
-        if (colIdx < collabQueue.length) {
-          finalPool.push(collabQueue[colIdx++])
-        } else if (cIdx < contentQueue.length) {
-          // Nếu hết bài Collab, lấy thêm bài Content để lấp chỗ trống
-          finalPool.push(contentQueue[cIdx++])
+      // 2. Fill Secondary slots cho trang hiện tại
+      for (let i = 0; i < secondaryPerPage && finalPool.length < maxPool; i++) {
+        if (sIdx < secondaryItems.length) {
+          finalPool.push(secondaryItems[sIdx++])
+        } else if (pIdx < primaryItems.length) {
+          // Nếu hết bài Secondary, lấy thêm bài Primary để lấp chỗ trống
+          finalPool.push(primaryItems[pIdx++])
         }
       }
     }
@@ -1055,7 +965,7 @@ class RecommendationService {
    */
   private buildInternalResult(
     items: ScoredItem[],
-    counts: { content?: number; collaborative?: number; trending?: number; following?: number },
+    counts: { content?: number; trending?: number; following?: number },
     startTime: number
   ): InternalResult {
     return {
@@ -1063,7 +973,6 @@ class RecommendationService {
       meta: {
         total_recommended: items.length,
         content_based_count: counts.content ?? 0,
-        collaborative_count: counts.collaborative ?? 0,
         trending_count: counts.trending ?? 0,
         following_count: counts.following ?? 0,
         processing_time_ms: Date.now() - startTime
@@ -1078,7 +987,6 @@ class RecommendationService {
     recoLog('Orchestrator', 'invalidateUserCache', { userId })
     this.scoredCache.delete(userId)
     contentBasedService.invalidateUserCache(userId)
-    collaborativeFilteringService.invalidateUserSimilarityCache(userId)
   }
 }
 
