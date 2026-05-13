@@ -93,10 +93,12 @@ export const getNewFeedsController = async (req: Request<ParamsDictionary, any, 
   const user_id = req.decoded_authorization?.user_id as string
   const limit = Number(req.query.limit)
   const page = Number(req.query.page)
+  const session_start = req.query.session_start as string | undefined
   const result = await twizzsService.getNewFeeds({
     user_id,
     limit,
-    page
+    page,
+    session_start
   })
   return res.json({
     message: TWIZZ_MESSAGES.GET_NEW_FEEDS_SUCCESSFULLY,
@@ -104,7 +106,8 @@ export const getNewFeedsController = async (req: Request<ParamsDictionary, any, 
       twizzs: result.twizzs,
       limit,
       page,
-      total_page: Math.ceil(result.total / limit)
+      total_page: Math.ceil(result.total / limit),
+      global_total: result.global_total
     }
   })
 }

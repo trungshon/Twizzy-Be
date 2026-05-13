@@ -57,3 +57,51 @@ export const invalidateRecommendationCacheController = async (req: Request, res:
     message: RECOMMENDATION_MESSAGES.CACHE_INVALIDATED_SUCCESSFULLY
   })
 }
+
+/**
+ * Đánh dấu danh sách bài viết đã xem.
+ *
+ * @method POST /recommendations/views
+ * @header Authorization: Bearer <access_token>
+ * @body twizz_ids - Mảng các ObjectId bài viết đã xem (tối đa 50)
+ */
+export const markViewedController = async (req: Request, res: Response) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const { twizz_ids } = req.body
+
+  // Validate twizz_ids
+  if (!Array.isArray(twizz_ids) || twizz_ids.length === 0) {
+    return res.status(400).json({
+      message: RECOMMENDATION_MESSAGES.TWIZZ_IDS_MUST_BE_ARRAY
+    })
+  }
+
+  if (twizz_ids.length > 50) {
+    return res.status(400).json({
+      message: RECOMMENDATION_MESSAGES.TWIZZ_IDS_TOO_MANY
+    })
+  }
+
+  recoLog('API', 'POST /recommendations/views', { user_id, count: twizz_ids.length })
+  await recommendationService.markTwizzsAsViewed(user_id, twizz_ids)
+
+  return res.json({
+    message: RECOMMENDATION_MESSAGES.MARK_VIEWED_SUCCESSFULLY
+  })
+}
+
+export const resetFollowingViewedController = async (req: Request, res: Response) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  await recommendationService.resetFollowingViewedTwizzs(user_id)
+  return res.json({
+    message: RECOMMENDATION_MESSAGES.RESET_FOLLOWING_VIEWED_SUCCESSFULLY
+  })
+}
+
+export const resetAllViewedController = async (req: Request, res: Response) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  await recommendationService.resetAllViewedTwizzs(user_id)
+  return res.json({
+    message: RECOMMENDATION_MESSAGES.RESET_ALL_VIEWED_SUCCESSFULLY
+  })
+}

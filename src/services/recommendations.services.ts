@@ -33,6 +33,7 @@ export interface PaginatedRecommendations {
   limit: number
   page: number
   total_page: number
+  global_total: number
   metadata: RecommendationMeta
 }
 
@@ -84,28 +85,40 @@ class RecommendationService {
     // Kiểm tra cache (key = userId, không phụ thuộc limit/page)
     const cached = this.scoredCache.get(userId)
     if (cached && cached.expiredAt > Date.now()) {
-      const totalPage = Math.max(1, Math.ceil(cached.items.length / limit))
-
-      if (page <= totalPage) {
-        // Pool chưa hết → phục vụ từ cache
-        recoLog('Orchestrator', 'Dùng pool đã cache (trang nằm trong pool)', {
+      // Xử lý Pool cạn kiệt: Nếu số lượng bài còn lại sau khi tỉa ít hơn limit, xóa cache để tạo Pool mới
+      if (cached.items.length < limit) {
+        recoLog('Orchestrator', 'Pool cạn kiệt do đã xem hết, xóa cache để tạo mới', {
           userId,
-          page,
-          totalPage,
-          sốBàiTrongPool: cached.items.length,
-          ttlCòn_ms: cached.expiredAt - Date.now()
+          limit,
+          remaining: cached.items.length
         })
-        return this.paginateAndPopulate(cached.items, cached.meta, userId, limit, page, startTime)
-      }
+        this.scoredCache.delete(userId)
+      } else {
+        const totalPage = Math.max(1, Math.ceil(cached.items.length / limit))
 
-      // Pool cạn kiệt → xóa cache để tính lại
-      recoLog('Orchestrator', 'Pool hết trang → xóa cache, sẽ tính lại pool mới', {
-        userId,
-        pageYêuCầu: page,
-        totalPageTrướcĐó: totalPage,
-        limit
-      })
-      this.scoredCache.delete(userId)
+        const global_total = await databaseService.twizzs.estimatedDocumentCount()
+
+        if (page <= totalPage) {
+          // Pool chưa hết → phục vụ từ cache
+          recoLog('Orchestrator', 'Dùng pool đã cache (trang nằm trong pool)', {
+            userId,
+            page,
+            totalPage,
+            sốBàiTrongPool: cached.items.length,
+            ttlCòn_ms: cached.expiredAt - Date.now()
+          })
+          return this.paginateAndPopulate(cached.items, cached.meta, userId, limit, page, startTime, global_total)
+        }
+
+        // Pool hết trang → xóa cache để tính lại
+        recoLog('Orchestrator', 'Pool hết trang → xóa cache, sẽ tính lại pool mới', {
+          userId,
+          pageYêuCầu: page,
+          totalPageTrướcĐó: totalPage,
+          limit
+        })
+        this.scoredCache.delete(userId)
+      }
     } else if (cached) {
       recoLog('Orchestrator', 'Cache pool hết hạn TTL', { userId })
       this.scoredCache.delete(userId)
@@ -115,18 +128,29 @@ class RecommendationService {
     const { effectiveCount, interactedMap } = await this.computeEffectiveInteractions(userId)
     const interactedIds = new Set(interactedMap.keys())
 
-    recoLog('Orchestrator', 'Chỉ số tương tác', { effectiveCount, interactedCount: interactedIds.size })
+    // Lấy danh sách bài đã xem (7 ngày gần nhất)
+    const viewedIds = await this.getViewedTwizzIds(userId)
+
+    // Gộp tất cả bài cần loại trừ: đã tương tác + đã xem
+    const excludeIds = new Set([...interactedIds, ...viewedIds])
+
+    recoLog('Orchestrator', 'Chỉ số tương tác', {
+      effectiveCount,
+      interactedCount: interactedIds.size,
+      viewedCount: viewedIds.size,
+      totalExcluded: excludeIds.size
+    })
 
     let internalResult: InternalResult
 
     if (effectiveCount === 0) {
       // Chưa có tương tác nào → Cold Start (Following 70% + Trending 30%)
       recoLog('Orchestrator', 'Chiến lược: Cold Start (chưa có tương tác)', { userId })
-      internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, interactedIds, startTime)
+      internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, excludeIds, startTime)
     } else {
       // Có tương tác → Content-Based 70% + Trending 30%
       recoLog('Orchestrator', 'Chiến lược: Content + Trending (70:30)', { userId, effectiveCount })
-      internalResult = await this.contentTrendingRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, interactedIds, startTime)
+      internalResult = await this.contentTrendingRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, excludeIds, startTime)
     }
 
     // Lưu cache scored items của pool mới
@@ -143,9 +167,11 @@ class RecommendationService {
       ttl_ms: this.SCORED_TTL
     })
 
+    const global_total = await databaseService.twizzs.estimatedDocumentCount()
+
     // Luôn trả về page 1 của pool mới (Flutter phát hiện qua response.page)
     recoLog('Orchestrator', 'Trả về trang 1 của pool mới (sau khi tính lại)', { userId, limit })
-    return this.paginateAndPopulate(internalResult.items, internalResult.meta, userId, limit, 1, startTime)
+    return this.paginateAndPopulate(internalResult.items, internalResult.meta, userId, limit, 1, startTime, global_total)
   }
 
   /**
@@ -157,10 +183,13 @@ class RecommendationService {
     userId: string,
     limit: number,
     page: number,
-    startTime: number
+    startTime: number,
+    global_total: number
   ): Promise<PaginatedRecommendations> {
     const total = items.length
-    const total_page = Math.max(1, Math.ceil(total / limit))
+    // Khi pool rỗng (đã xem hết), trả về total_page = 0
+    // để Flutter nhận biết trạng thái "Caught Up" thay vì lặp lại
+    const total_page = total === 0 ? 0 : Math.max(1, Math.ceil(total / limit))
     const pageItems = items.slice((page - 1) * limit, page * limit)
     const twizzs = await this.populateTwizzsByIds(pageItems, userId)
 
@@ -176,6 +205,7 @@ class RecommendationService {
       limit,
       page,
       total_page,
+      global_total,
       metadata: {
         ...meta,
         processing_time_ms: Date.now() - startTime
@@ -642,7 +672,7 @@ class RecommendationService {
       trendingLimit
     })
 
-    const contentResults = await contentBasedService.getRecommendations(userId, contentLimit)
+    const contentResults = await contentBasedService.getRecommendations(userId, contentLimit, interactedIds)
 
     const contentItems: ScoredItem[] = contentResults.map((r) => ({
       twizz_id: r.twizz_id,
@@ -750,6 +780,7 @@ class RecommendationService {
       {
         $match: {
           user_id: { $in: followedIds },
+          _id: { $nin: excludeObjectIds },
           type: { $in: [TwizzType.Twizz, TwizzType.QuoteTwizz] }
         }
       },
@@ -988,12 +1019,158 @@ class RecommendationService {
   }
 
   /**
+   * Lưu danh sách bài viết đã xem vào DB.
+   * Dùng bulkWrite với upsert để tránh trùng lặp.
+   */
+  async markTwizzsAsViewed(userId: string, twizzIds: string[]): Promise<void> {
+    if (twizzIds.length === 0) return
+
+    const userObjectId = new ObjectId(userId)
+    const now = new Date()
+
+    const operations = twizzIds.map((id) => ({
+      updateOne: {
+        filter: { user_id: userObjectId, twizz_id: new ObjectId(id) },
+        update: {
+          $setOnInsert: {
+            user_id: userObjectId,
+            twizz_id: new ObjectId(id),
+            created_at: now
+          }
+        },
+        upsert: true
+      }
+    }))
+
+    await databaseService.recommendationViews.bulkWrite(operations, { ordered: false })
+
+    // Tỉa cache trực tiếp: Loại bỏ bài vừa xem khỏi Pool hiện tại
+    const cached = this.scoredCache.get(userId)
+    if (cached) {
+      const viewedSet = new Set(twizzIds)
+      const originalLength = cached.items.length
+      cached.items = cached.items.filter((item) => !viewedSet.has(item.twizz_id.toString()))
+
+      recoLog('Orchestrator', 'Đã tỉa Cache sau khi user xem bài', {
+        userId,
+        bàiTrongCacheTrướcĐó: originalLength,
+        bàiTrongCacheSauĐó: cached.items.length
+      })
+    }
+
+    recoLog('Orchestrator', 'markTwizzsAsViewed', {
+      userId,
+      count: twizzIds.length
+    })
+  }
+
+  /**
+   * Lấy danh sách ID các bài viết user đã xem (Set<string>)
+   */
+  public async getViewedTwizzIds(userId: string, sessionStart?: string): Promise<Set<string>> {
+    const userObjectId = new ObjectId(userId)
+    const query: any = { user_id: userObjectId }
+
+    if (sessionStart) {
+      query.created_at = { $lte: new Date(sessionStart) }
+    }
+
+    const views = await databaseService.recommendationViews
+      .find(
+        query,
+        { projection: { twizz_id: 1, _id: 0 } }
+      )
+      .toArray()
+
+    const viewedIds = new Set(views.map((v) => v.twizz_id.toString()))
+
+    recoLog('Orchestrator', 'getViewedTwizzIds', {
+      userId,
+      viewedCount: viewedIds.size
+    })
+
+    return viewedIds
+  }
+
+  /**
    * Xóa cache của user khi có tương tác mới.
    */
   invalidateUserCache(userId: string): void {
     recoLog('Orchestrator', 'invalidateUserCache', { userId })
     this.scoredCache.delete(userId)
     contentBasedService.invalidateUserCache(userId)
+  }
+
+  /**
+   * Reset lịch sử đã xem cho các bài viết thuộc tab Following (những người đang theo dõi)
+   */
+  async resetFollowingViewedTwizzs(userId: string) {
+    const userObjectId = new ObjectId(userId)
+
+    // 1. Lấy danh sách ID những người đang theo dõi
+    const followers = await databaseService.followers
+      .find({ user_id: userObjectId }, { projection: { followed_user_id: 1, _id: 0 } })
+      .toArray()
+    const followedUserIds = followers.map((f) => f.followed_user_id)
+
+    if (followedUserIds.length === 0) return
+
+    // 2. Tìm tất cả twizz_id của những người đó mà user đã xem
+    // Chúng ta có thể dùng aggregation để join và delete hoặc làm 2 bước
+    const viewsToReset = await databaseService.recommendationViews
+      .aggregate([
+        {
+          $match: { user_id: userObjectId }
+        },
+        {
+          $lookup: {
+            from: process.env.DB_TWIZZS_COLLECTION as string,
+            localField: 'twizz_id',
+            foreignField: '_id',
+            as: 'twizz'
+          }
+        },
+        {
+          $unwind: '$twizz'
+        },
+        {
+          $match: {
+            'twizz.user_id': { $in: followedUserIds }
+          }
+        },
+        {
+          $project: { twizz_id: 1 }
+        }
+      ])
+      .toArray()
+
+    const twizzIdsToReset = viewsToReset.map((v) => v.twizz_id)
+
+    if (twizzIdsToReset.length > 0) {
+      // 3. Xoá các bản ghi đã xem này
+      await databaseService.recommendationViews.deleteMany({
+        user_id: userObjectId,
+        twizz_id: { $in: twizzIdsToReset }
+      })
+    }
+  }
+
+  /**
+   * Reset TẤT CẢ lịch sử đã xem (tab Đề xuất - For You)
+   * Phương án : Nuclear Reset
+   */
+  async resetAllViewedTwizzs(userId: string) {
+    const userObjectId = new ObjectId(userId)
+
+    // 1. Xóa sạch DB
+    await databaseService.recommendationViews.deleteMany({
+      user_id: userObjectId
+    })
+
+    // 2. Xóa Cache để ép tính toán lại
+    this.invalidateUserCache(userId)
+
+    recoLog('Orchestrator', 'Đã reset TOÀN BỘ lịch sử đã xem (Nuclear Reset)', { userId })
   }
 }
 

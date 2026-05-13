@@ -34,7 +34,7 @@ class ContentBasedService {
    * Lấy gợi ý bài viết dựa trên Semantic Content-Based Filtering.
    * Sử dụng Vector Embedding và MongoDB Atlas Vector Search.
    */
-  async getRecommendations(userId: string, limit: number): Promise<ContentBasedResult[]> {
+  async getRecommendations(userId: string, limit: number, externalExcludeIds?: Set<string>): Promise<ContentBasedResult[]> {
     recoLog('ContentBased', 'Bắt đầu getRecommendations (Semantic)', { userId, limit })
 
     // 1. Lấy danh sách bài đã tương tác để xây dựng Profile
@@ -52,7 +52,16 @@ class ContentBasedService {
     }
 
     // 3. Thực hiện Vector Search trên MongoDB Atlas
-    const excludeIds = Array.from(interactedTwizzIds.keys()).map((id) => new ObjectId(id))
+    const excludeIdsSet = new Set<string>()
+    for (const id of interactedTwizzIds.keys()) {
+      excludeIdsSet.add(id)
+    }
+    if (externalExcludeIds) {
+      for (const id of externalExcludeIds) {
+        excludeIdsSet.add(id)
+      }
+    }
+    const excludeIds = Array.from(excludeIdsSet).map((id) => new ObjectId(id))
     const userObjectId = new ObjectId(userId)
 
     recoLog('ContentBased', 'Đang gọi Atlas Vector Search...', { userId })

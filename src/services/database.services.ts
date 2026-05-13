@@ -10,6 +10,7 @@ import Like from '~/models/schemas/Like.schema'
 import Conversation from '~/models/schemas/Conversations.schema'
 import Notification from '~/models/schemas/Notification.schema'
 import Report from '~/models/schemas/Report.schema'
+import RecommendationView from '~/models/schemas/RecommendationView.schema'
 config()
 
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@twizzy.glhnqkl.mongodb.net/?appName=Twizzy`
@@ -61,6 +62,24 @@ class DatabaseService {
       this.twizzs.createIndex({ content: 'text' }, { default_language: 'none' })
     }
   }
+  // tạo index cho recommendation_views collection
+  async indexRecommendationViews() {
+    let exists = false
+    try {
+      exists = await this.recommendationViews.indexExists(['user_id_1_twizz_id_1'])
+    } catch (error: any) {
+      if (error.codeName !== 'NamespaceNotFound') {
+        console.error('Error checking index:', error)
+      }
+    }
+
+    if (!exists) {
+      // Unique compound index: tránh ghi trùng (1 user chỉ có 1 bản ghi xem cho 1 bài)
+      this.recommendationViews.createIndex({ user_id: 1, twizz_id: 1 }, { unique: true })
+      // TTL index: tự động xóa bản ghi sau 30 ngày (2,592,000 giây)
+      this.recommendationViews.createIndex({ created_at: 1 }, { expireAfterSeconds: 2592000 })
+    }
+  }
 
   get users(): Collection<User> {
     return this.db.collection(process.env.DB_USERS_COLLECTION as string)
@@ -100,6 +119,10 @@ class DatabaseService {
 
   get reports(): Collection<Report> {
     return this.db.collection(process.env.DB_REPORTS_COLLECTION as string)
+  }
+
+  get recommendationViews(): Collection<RecommendationView> {
+    return this.db.collection(process.env.DB_RECOMMENDATION_VIEWS_COLLECTION as string)
   }
 }
 

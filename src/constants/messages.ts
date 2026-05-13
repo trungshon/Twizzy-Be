@@ -149,6 +149,11 @@ export const REPORT_MESSAGES = {
 export const RECOMMENDATION_MESSAGES = {
   GET_RECOMMENDATIONS_SUCCESSFULLY: 'Lấy gợi ý bài viết thành công',
   GET_RECOMMENDATIONS_FAILED: 'Lấy gợi ý bài viết thất bại',
-  CACHE_INVALIDATED_SUCCESSFULLY: 'Đã làm mới cache gợi ý thành công'
+  CACHE_INVALIDATED_SUCCESSFULLY: 'Đã làm mới cache gợi ý thành công',
+  MARK_VIEWED_SUCCESSFULLY: 'Đánh dấu bài viết đã xem thành công',
+  RESET_FOLLOWING_VIEWED_SUCCESSFULLY: 'Đã làm mới danh sách bài viết đang theo dõi',
+  RESET_ALL_VIEWED_SUCCESSFULLY: 'Đã làm mới danh sách tất cả bài viết',
+  TWIZZ_IDS_MUST_BE_ARRAY: 'twizz_ids phải là một mảng các ID hợp lệ',
+  TWIZZ_IDS_TOO_MANY: 'Tối đa 50 bài viết mỗi lần đánh dấu'
 } as const
 

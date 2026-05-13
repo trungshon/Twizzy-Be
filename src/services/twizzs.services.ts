@@ -1100,7 +1100,7 @@ class TwizzsService {
     }
   }
 
-  async getNewFeeds({ user_id, limit, page }: { user_id: string; limit: number; page: number }) {
+  async getNewFeeds({ user_id, limit, page, session_start }: { user_id: string; limit: number; page: number; session_start?: string }) {
     const user_id_objectId = new ObjectId(user_id)
     const followed_users_ids = await databaseService.followers
       .find(
@@ -1113,11 +1113,17 @@ class TwizzsService {
     const ids = followed_users_ids.map((item) => item.followed_user_id)
     // Mong muốn newfeeds sẽ lấy luôn cả twizz của mình
     ids.push(user_id_objectId)
-    const [twizzs, total] = await Promise.all([
+
+    // Lấy danh sách bài đã xem để loại bỏ
+    const viewedIds = await recommendationService.getViewedTwizzIds(user_id, session_start)
+    const viewedIdsArray = Array.from(viewedIds).map((id) => new ObjectId(id))
+
+    const [twizzs, total, global_total_result] = await Promise.all([
       databaseService.twizzs
         .aggregate([
           {
             $match: {
+              _id: { $nin: viewedIdsArray },
               user_id: {
                 $in: ids
               },
@@ -1487,6 +1493,7 @@ class TwizzsService {
               twizz_children: 0,
               user_likes: 0,
               user_bookmarks: 0,
+              content_vector: 0,
               user: {
                 password: 0,
                 email_verify_token: 0,
@@ -1505,6 +1512,7 @@ class TwizzsService {
         .aggregate([
           {
             $match: {
+              _id: { $nin: viewedIdsArray },
               user_id: {
                 $in: ids
               },
@@ -1552,6 +1560,44 @@ class TwizzsService {
             $count: 'total'
           }
         ])
+        .toArray(),
+      databaseService.twizzs
+        .aggregate([
+          {
+            $match: {
+              user_id: { $in: ids },
+              type: { $ne: TwizzType.Comment }
+            }
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user_id',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $unwind: { path: '$user' }
+          },
+          {
+            $match: {
+              $or: [
+                { audience: TwizzAudience.Everyone },
+                { user_id: user_id_objectId },
+                {
+                  $and: [
+                    { audience: TwizzAudience.TwizzCircle },
+                    { 'user.twizz_circle': { $in: [user_id_objectId] } }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            $count: 'total'
+          }
+        ])
         .toArray()
     ])
     const twizz_ids = twizzs.map((twizz) => twizz._id as ObjectId)
@@ -1565,7 +1611,11 @@ class TwizzsService {
       twizz.updated_at = date
       twizz.user_views = twizz.user_views + 1
     })
-    return { twizzs, total: total.length > 0 ? total[0].total : 0 }
+    return { 
+      twizzs, 
+      total: total.length > 0 ? total[0].total : 0,
+      global_total: global_total_result.length > 0 ? global_total_result[0].total : 0
+    }
   }
 
   async getUserTwizzs({

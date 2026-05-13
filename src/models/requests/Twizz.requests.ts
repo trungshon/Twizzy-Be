@@ -21,6 +21,7 @@ export interface TwizzParam extends ParamsDictionary {
 }
 
 export interface Pagination {
+  session_start: string | undefined
   limit: string
   page: string
 }

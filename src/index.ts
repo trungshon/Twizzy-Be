@@ -31,6 +31,7 @@ databaseService.connect().then(() => {
   databaseService.indexRefreshTokens()
   databaseService.indexFollowers()
   databaseService.indexTwizzs()
+  databaseService.indexRecommendationViews()
 })
 const app = express()
 const httpServer = createServer(app)

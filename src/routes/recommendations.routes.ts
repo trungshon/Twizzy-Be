@@ -3,7 +3,10 @@ import { accessTokenValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
 import {
   getRecommendationsController,
-  invalidateRecommendationCacheController
+  invalidateRecommendationCacheController,
+  markViewedController,
+  resetFollowingViewedController,
+  resetAllViewedController
 } from '~/controllers/recommendations.controllers'
 
 const recommendationsRouter = Router()
@@ -33,6 +36,46 @@ recommendationsRouter.delete(
   '/cache',
   accessTokenValidator,
   wrapRequestHandler(invalidateRecommendationCacheController)
+)
+
+/**
+ * @description Đánh dấu bài viết đã xem (gọi từ App khi user lướt qua bài)
+ * @path /recommendations/views
+ * @method POST
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ * @body {
+ *   twizz_ids: string[]  (mảng ID bài viết, tối đa 50)
+ * }
+ */
+recommendationsRouter.post(
+  '/views',
+  accessTokenValidator,
+  wrapRequestHandler(markViewedController)
+)
+
+/**
+ * Description: Reset lịch sử đã xem cho tab Following
+ * Path: /views/following
+ * Method: DELETE
+ * Header: { Authorization: Bearer <access_token> }
+ */
+recommendationsRouter.delete(
+  '/views/following',
+  accessTokenValidator,
+  wrapRequestHandler(resetFollowingViewedController)
+)
+/**
+ * @description Reset TẤT CẢ lịch sử đã xem (For You tab)
+ * @path /recommendations/views
+ * @method DELETE
+ * @header Authorization: Bearer <access_token>
+ */
+recommendationsRouter.delete(
+  '/views',
+  accessTokenValidator,
+  wrapRequestHandler(resetAllViewedController)
 )
 
 export default recommendationsRouter
