@@ -11,7 +11,7 @@ export interface ContentBasedResult {
   reason: string
 }
 
-// Vector ý nghĩa: mảng 384 số thực
+// Vector ý nghĩa: mảng 768 số thực
 type SemanticVector = number[]
 
 // Trọng số tín hiệu tương tác khi xây User Profile
@@ -137,14 +137,14 @@ class ContentBasedService {
     if (twizzs.length === 0) return []
 
     // 3. Tính Trung bình cộng có trọng số (Weighted Mean)
-    const vectorSum = new Array(384).fill(0)
+    const vectorSum = new Array(768).fill(0)
     let totalWeight = 0
 
     for (const twizz of twizzs) {
       const weight = interactedTwizzIds.get(twizz._id.toString()) || 1.0
       const vector = twizz.content_vector as number[]
 
-      for (let i = 0; i < 384; i++) {
+      for (let i = 0; i < 768; i++) {
         vectorSum[i] += vector[i] * weight
       }
       totalWeight += weight

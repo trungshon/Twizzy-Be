@@ -60,7 +60,7 @@ export default class User {
   role: UserRole
   violation_count: number
   fcm_tokens: string[]
-  interest_vector?: number[] // Vector 384 chiều biểu diễn sở thích người dùng
+  interest_vector?: number[] // Vector 768 chiều biểu diễn sở thích người dùng
 
   constructor(user: UserType) {
     const date = new Date()

@@ -111,21 +111,22 @@ class RecommendationService {
       this.scoredCache.delete(userId)
     }
 
-    // Tính chỉ số tương tác để chọn chiến lược
-    const { effectiveCount } = await this.computeEffectiveInteractions(userId)
+    // Tính chỉ số tương tác và lấy danh sách ID đã tương tác
+    const { effectiveCount, interactedMap } = await this.computeEffectiveInteractions(userId)
+    const interactedIds = new Set(interactedMap.keys())
 
-    recoLog('Orchestrator', 'Chỉ số tương tác', { effectiveCount })
+    recoLog('Orchestrator', 'Chỉ số tương tác', { effectiveCount, interactedCount: interactedIds.size })
 
     let internalResult: InternalResult
 
     if (effectiveCount === 0) {
       // Chưa có tương tác nào → Cold Start (Following 70% + Trending 30%)
       recoLog('Orchestrator', 'Chiến lược: Cold Start (chưa có tương tác)', { userId })
-      internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, startTime)
+      internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, interactedIds, startTime)
     } else {
       // Có tương tác → Content-Based 70% + Trending 30%
       recoLog('Orchestrator', 'Chiến lược: Content + Trending (70:30)', { userId, effectiveCount })
-      internalResult = await this.contentTrendingRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, startTime)
+      internalResult = await this.contentTrendingRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, interactedIds, startTime)
     }
 
     // Lưu cache scored items của pool mới
@@ -527,7 +528,7 @@ class RecommendationService {
    */
   private async computeEffectiveInteractions(
     userId: string
-  ): Promise<{ effectiveCount: number; distinctTwizzCount: number }> {
+  ): Promise<{ effectiveCount: number; distinctTwizzCount: number; interactedMap: Map<string, number> }> {
     const interactedMap = await contentBasedService.getInteractedTwizzIds(userId)
 
     let effectiveCount = 0
@@ -543,7 +544,7 @@ class RecommendationService {
       distinctTwizzCount
     })
 
-    return { effectiveCount, distinctTwizzCount }
+    return { effectiveCount, distinctTwizzCount, interactedMap }
   }
 
   /**
@@ -554,6 +555,7 @@ class RecommendationService {
     userId: string,
     poolSize: number,
     pageLimit: number,
+    interactedIds: Set<string>,
     startTime: number
   ): Promise<InternalResult> {
     const followingCount = await databaseService.followers.countDocuments({
@@ -577,8 +579,8 @@ class RecommendationService {
         trendingLimit
       })
 
-      followingItems = await this.getFollowingTwizzs(userId, followingLimit)
-      const excludeIds = new Set(followingItems.map((t) => t.twizz_id.toString()))
+      followingItems = await this.getFollowingTwizzs(userId, followingLimit, interactedIds)
+      const excludeIds = new Set([...interactedIds, ...followingItems.map((t) => t.twizz_id.toString())])
       trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, excludeIds)
 
       // Xen kẽ 70:30 per page (14 following + 6 trending)
@@ -599,7 +601,7 @@ class RecommendationService {
     } else {
       // Không follow ai → chỉ trending
       recoLog('Orchestrator', 'Cold Start: user không follow ai → chỉ trending', { userId, poolSize })
-      trendingItems = await this.getTrendingTwizzs(userId, poolSize, new Set())
+      trendingItems = await this.getTrendingTwizzs(userId, poolSize, interactedIds)
 
       const deduplicated = this.deduplicateAndDiversify(trendingItems, poolSize)
 
@@ -625,6 +627,7 @@ class RecommendationService {
     userId: string,
     poolSize: number,
     pageLimit: number,
+    interactedIds: Set<string>,
     startTime: number
   ): Promise<InternalResult> {
     // Lấy content (70% pool) và trending (30% pool)
@@ -648,8 +651,8 @@ class RecommendationService {
       algorithm: 'content' as const
     }))
 
-    // Trending lấy thêm, loại trùng với content
-    const excludeIds = new Set(contentItems.map((t) => t.twizz_id.toString()))
+    // Trending lấy thêm, loại trùng với content và bài đã tương tác
+    const excludeIds = new Set([...interactedIds, ...contentItems.map((t) => t.twizz_id.toString())])
     const trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, excludeIds)
 
     recoLog('Orchestrator', 'Content+Trending: kết quả thô', {
@@ -729,9 +732,10 @@ class RecommendationService {
   /**
    * Lấy bài viết từ những người user đang follow.
    */
-  private async getFollowingTwizzs(userId: string, limit: number): Promise<ScoredItem[]> {
+  private async getFollowingTwizzs(userId: string, limit: number, excludeIds: Set<string>): Promise<ScoredItem[]> {
+    const userObjectId = new ObjectId(userId)
     const following = await databaseService.followers
-      .find({ user_id: new ObjectId(userId) }, { projection: { followed_user_id: 1 } })
+      .find({ user_id: userObjectId }, { projection: { followed_user_id: 1 } })
       .toArray()
 
     if (following.length === 0) {
@@ -740,7 +744,7 @@ class RecommendationService {
     }
 
     const followedIds = following.map((f) => f.followed_user_id)
-    const userObjectId = new ObjectId(userId)
+    const excludeObjectIds = Array.from(excludeIds).map(id => new ObjectId(id))
 
     const pipeline = [
       {
@@ -802,10 +806,13 @@ class RecommendationService {
     const fromDate = new Date()
     fromDate.setDate(fromDate.getDate() - TRENDING_DAYS)
 
+    const excludeObjectIds = Array.from(excludeIds).map(id => new ObjectId(id))
+
     const pipeline = [
       // Bước 2: Lọc các bài viết thỏa mãn điều kiện cơ bản
       {
         $match: {
+          _id: { $nin: excludeObjectIds }, // Lọc bài đã tương tác
           type: { $in: [TwizzType.Twizz, TwizzType.QuoteTwizz] },// Lấy bài gốc và bài Quote, không lấy comment
           audience: TwizzAudience.Everyone, // Chỉ bài public
           user_id: { $ne: new ObjectId(userId) }, // Không lấy bài của chính người đang xem

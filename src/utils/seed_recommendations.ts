@@ -452,7 +452,7 @@ async function createUser(key: string) {
     username_changed: false,
     email_verify_otp_expires_at: null,
     forgot_password_otp_expires_at: null,
-    interest_vector: new Array(384).fill(new Double(0)) // Ép kiểu Double để thỏa mãn MongoDB Validation
+    interest_vector: new Array(768).fill(new Double(0)) // Ép kiểu Double để thỏa mãn MongoDB Validation
   }
 
   await databaseService.users.insertOne(user as any)

@@ -33,7 +33,7 @@ export default class Twizz {
   user_views: number
   created_at: Date
   updated_at: Date
-  content_vector?: number[] // Vector 384 chiều biểu diễn ý nghĩa bài viết
+  content_vector?: number[] // Vector 768 chiều biểu diễn ý nghĩa bài viết
 
   constructor({
     _id,

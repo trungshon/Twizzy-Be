@@ -3,8 +3,8 @@ import { recoLog } from '~/utils/recommendationLogger'
 
 class EmbeddingService {
   private extractor: any = null
-  // Tên mô hình đa ngôn ngữ (hỗ trợ tiếng Việt) tốt nhất cho quy mô Mini
-  private readonly MODEL_NAME = 'Xenova/paraphrase-multilingual-MiniLM-L12-v2'
+  // Mô hình đa ngôn ngữ (hỗ trợ tiếng Việt) chất lượng cao
+  private readonly MODEL_NAME = 'Xenova/paraphrase-multilingual-mpnet-base-v2'
 
   /**
    * Khởi tạo mô hình AI (Lazy loading - chỉ nạp khi cần dùng)
@@ -20,14 +20,14 @@ class EmbeddingService {
   }
 
   /**
-   * Chuyển đổi văn bản thành Vector 384 chiều
+   * Chuyển đổi văn bản thành Vector 768 chiều
    * @param text Nội dung cần chuyển đổi
-   * @returns Mảng 384 số thực (Vector)
+   * @returns Mảng 768 số thực (Vector)
    */
   async generateEmbedding(text: string): Promise<number[]> {
     if (!text || text.trim() === '') {
       // Trả về vector 0 nếu văn bản trống (để không làm lỗi DB)
-      return new Array(384).fill(0)
+      return new Array(768).fill(0)
     }
 
     try {
@@ -49,7 +49,7 @@ class EmbeddingService {
         error: error instanceof Error ? error.message : String(error) 
       })
       // Fallback: trả về vector 0 nếu có lỗi để tránh crash hệ thống
-      return new Array(384).fill(0)
+      return new Array(768).fill(0)
     }
   }
 }
