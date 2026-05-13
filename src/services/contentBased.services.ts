@@ -21,6 +21,9 @@ const INTERACTION_WEIGHTS = {
   quote: 1.5
 }
 
+// Chu kỳ bán rã cho Content-Based (7 ngày). Sau 7 ngày, điểm similarity sẽ giảm đi một nửa.
+const CONTENT_DECAY_HALFLIFE_DAYS = 7
+
 class ContentBasedService {
   // Cache User Profile Vector (TTL: 1 giờ)
   private userProfileCache: Map<string, { vector: SemanticVector; expiredAt: number }>
@@ -66,15 +69,15 @@ class ContentBasedService {
 
     recoLog('ContentBased', 'Đang gọi Atlas Vector Search...', { userId })
 
-    // Chúng ta lấy nhiều ứng viên hơn một chút (numCandidates) để sau đó lọc Circle
+    // Chúng ta lấy nhiều ứng viên hơn (numCandidates) để sau đó re-rank theo thời gian
     const results = await databaseService.twizzs.aggregate([
       {
         $vectorSearch: {
-          index: 'vector_index', // Tên index bạn đã tạo trên Atlas
+          index: 'vector_index',
           path: 'content_vector',
           queryVector: userVector,
-          numCandidates: limit * 5, // Lấy dư ra để lọc
-          limit: limit * 2,
+          numCandidates: limit * 10, // Lấy pool rộng để không bỏ lỡ bài mới
+          limit: limit * 4,           // Lấy dư ra để lọc Audience và tính decay
           filter: {
             _id: { $nin: excludeIds },
             user_id: { $ne: userObjectId },
@@ -105,24 +108,46 @@ class ContentBasedService {
           ]
         }
       },
-      // Trích xuất điểm số tương đồng từ metadata của Atlas Search
+      // Tính toán Time Decay
       {
         $addFields: {
-          searchScore: { $meta: 'vectorSearchScore' }
+          days_ago: {
+            $divide: [{ $subtract: [new Date(), '$created_at'] }, 1000 * 60 * 60 * 24]
+          },
+          vectorScore: { $meta: 'vectorSearchScore' }
         }
       },
+      {
+        $addFields: {
+          // Công thức: FinalScore = VectorScore * (Halflife / (Halflife + days_ago))
+          decayedScore: {
+            $multiply: [
+              '$vectorScore',
+              {
+                $divide: [
+                  CONTENT_DECAY_HALFLIFE_DAYS,
+                  { $add: [CONTENT_DECAY_HALFLIFE_DAYS, '$days_ago'] }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      // Sắp xếp lại theo điểm đã suy giảm theo thời gian
+      { $sort: { decayedScore: -1 } },
       { $limit: limit }
     ]).toArray()
 
-    recoLog('ContentBased', 'Hoàn tất Vector Search', {
+    recoLog('ContentBased', 'Hoàn tất Vector Search + Time Decay', {
       userId,
-      sốKếtQuả: results.length
+      sốKếtQuả: results.length,
+      halflife: CONTENT_DECAY_HALFLIFE_DAYS
     })
 
     return results.map((r) => ({
       twizz_id: r._id as ObjectId,
-      score: r.searchScore,
-      reason: 'Dựa trên nội dung bạn quan tâm (Semantic)'
+      score: r.decayedScore,
+      reason: 'Dựa trên nội dung bạn quan tâm và độ mới'
     }))
   }
 
