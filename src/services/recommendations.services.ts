@@ -40,7 +40,12 @@ export interface PaginatedRecommendations {
 // Trọng số tính effective_interactions (nhất quán với contentBased.services.ts)
 const EFFECTIVE_WEIGHTS = { like: 1.0, comment: 1.2, quote: 1.5 }
 
-// Tỉ lệ xen kẽ chính:phụ trên mỗi trang (70% : 30%)
+// Ngưỡng và tỷ lệ cho chiến lược chuyển đổi mềm (Soft Transition)
+const EFFECTIVE_THRESHOLD = 5 // Ngưỡng để trở thành Active User
+const WARM_UP_RATIO = 0.3 // 30% Content-Based cho người mới (1-5 interactions)
+const ACTIVE_RATIO = 0.7 // 70% Content-Based cho người dùng tích cực (>5)
+
+// Tỉ lệ mặc định cho Cold Start (Following:Trending)
 const PRIMARY_RATIO = 0.7
 
 // Trọng số Cold Start khi có follow
@@ -145,12 +150,18 @@ class RecommendationService {
 
     if (effectiveCount === 0) {
       // Chưa có tương tác nào → Cold Start (Following 70% + Trending 30%)
-      recoLog('Orchestrator', 'Chiến lược: Cold Start (chưa có tương tác)', { userId })
+      recoLog('Orchestrator', 'Chiến lược: Cold Start (0 tương tác)', { userId })
       internalResult = await this.coldStartRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, excludeIds, startTime)
     } else {
-      // Có tương tác → Content-Based 70% + Trending 30%
-      recoLog('Orchestrator', 'Chiến lược: Content + Trending (70:30)', { userId, effectiveCount })
-      internalResult = await this.contentTrendingRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, excludeIds, startTime)
+      // Có tương tác → Áp dụng chuyển đổi mềm (Soft Transition)
+      const ratio = effectiveCount < EFFECTIVE_THRESHOLD ? WARM_UP_RATIO : ACTIVE_RATIO
+      recoLog('Orchestrator', 'Chiến lược: Hybrid (Content + Trending)', {
+        userId,
+        effectiveCount,
+        ratio,
+        ngưỡng: EFFECTIVE_THRESHOLD
+      })
+      internalResult = await this.contentTrendingRecommendations(userId, RECOMMENDATION_POOL_SIZE, limit, excludeIds, startTime, ratio)
     }
 
     // Lưu cache scored items của pool mới
@@ -614,7 +625,8 @@ class RecommendationService {
       trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, excludeIds)
 
       // Xen kẽ 70:30 per page (14 following + 6 trending)
-      const interleaved = this.interleaveResults(followingItems, trendingItems, pageLimit, poolSize)
+      // Xen kẽ mặc định 70:30 cho Cold Start (Following:Trending)
+      const interleaved = this.interleaveResults(followingItems, trendingItems, pageLimit, poolSize, PRIMARY_RATIO)
 
       recoLog('Orchestrator', 'Cold Start: sau interleave', {
         userId,
@@ -658,10 +670,11 @@ class RecommendationService {
     poolSize: number,
     pageLimit: number,
     interactedIds: Set<string>,
-    startTime: number
+    startTime: number,
+    ratio: number
   ): Promise<InternalResult> {
-    // Lấy content (70% pool) và trending (30% pool)
-    const contentLimit = Math.ceil(poolSize * PRIMARY_RATIO)
+    // Lấy content (theo ratio) và trending (phần còn lại)
+    const contentLimit = Math.ceil(poolSize * ratio)
     const trendingLimit = poolSize - contentLimit
 
     recoLog('Orchestrator', 'Content+Trending: gọi song song', {
@@ -691,8 +704,8 @@ class RecommendationService {
       trendingCount: trendingItems.length
     })
 
-    // Xen kẽ 70:30 per page (14 content + 6 trending)
-    const interleaved = this.interleaveResults(contentItems, trendingItems, pageLimit, poolSize)
+    // Xen kẽ theo ratio trên từng trang
+    const interleaved = this.interleaveResults(contentItems, trendingItems, pageLimit, poolSize, ratio)
 
     // Đếm lại số lượng từ mỗi nguồn sau khi interleave
     let contentCount = 0
@@ -728,12 +741,13 @@ class RecommendationService {
     primaryItems: ScoredItem[],
     secondaryItems: ScoredItem[],
     pageLimit: number,
-    maxPool: number
+    maxPool: number,
+    ratio: number = PRIMARY_RATIO
   ): ScoredItem[] {
     const finalPool: ScoredItem[] = []
 
-    // Tỉ lệ mỗi trang (pageLimit=20 → 14 primary, 6 secondary)
-    const primaryPerPage = Math.ceil(pageLimit * PRIMARY_RATIO)
+    // Tỉ lệ mỗi trang dựa trên ratio truyền vào
+    const primaryPerPage = Math.ceil(pageLimit * ratio)
     const secondaryPerPage = pageLimit - primaryPerPage
 
     let pIdx = 0

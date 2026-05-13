@@ -2,7 +2,7 @@
  * Log thống nhất cho pipeline gợi ý bài viết.
  * Trên terminal: grep theo `[Gợi ý]` để xem toàn bộ luồng.
  *
- * @param tier - Nhóm: API | Orchestrator | ContentBased | CF | NLP
+ * @param tier - Nhóm: API | Orchestrator | ContentBased
  * @param message - Mô tả bước (tiếng Việt)
  * @param data - Thông tin bổ sung (object, optional)
  */

@@ -542,6 +542,7 @@ async function main() {
   console.log('[seed] Creating users...')
   const userColdNoFollow = await createUser('cold_no_follow')
   const userColdFollow = await createUser('cold_follow')
+  const userContentWarm = await createUser('content_warm')
   const userContentOnly = await createUser('content_only')
   const userContentActive = await createUser('content_active')
   const userContentNiche = await createUser('content_niche')
@@ -612,7 +613,15 @@ async function main() {
     }
   }
 
-  // Content Only (Football) — ít tương tác, chỉ 5 like
+  // 6. User Content Warm (Travel) — THỨ 2: WARM UP (30:70)
+  // Chỉ 2 like → effectiveCount < 5 → Tỷ lệ Content 30%
+  const travelPosts = twizzPool.filter(p => p.topic === 'travel').slice(0, 2)
+  for (const p of travelPosts) {
+    await databaseService.likes.insertOne(new Like({ user_id: userContentWarm, twizz_id: p._id, created_at: new Date() }))
+  }
+
+  // 7. User Content Only (Football) — THỨ 3: ACTIVE (70:30)
+  // Đúng 5 like → effectiveCount >= 5 → Tỷ lệ Content 70%
   const fbPosts = twizzPool.filter(p => p.topic === 'football').slice(0, 5)
   for (const p of fbPosts) await databaseService.likes.insertOne(new Like({ user_id: userContentOnly, twizz_id: p._id, created_at: new Date() }))
 
