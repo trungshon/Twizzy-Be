@@ -1,4 +1,4 @@
-import { MongoClient, Db, Collection } from 'mongodb'
+import { MongoClient, Db, Collection, Int32 } from 'mongodb'
 import { config } from 'dotenv'
 import User from '~/models/schemas/User.schema'
 import RefreshToken from '~/models/schemas/RefreshToken.schema'
@@ -30,6 +30,40 @@ class DatabaseService {
     } catch (error) {
       console.log('Error connecting to MongoDB', error)
       throw error
+    }
+  }
+
+  // Tự động bổ sung các trường bắt buộc của schema đối với các tài khoản cũ trong DB
+  async migrateUsersSchema() {
+    try {
+      // 1. Cập nhật violation_count thành 0 cho các user chưa có
+      const resViolation = await this.users.updateMany(
+        { violation_count: { $exists: false } },
+        { $set: { violation_count: new Int32(0) as any } }
+      )
+      if (resViolation.modifiedCount > 0) {
+        console.log(`[Migration] Đã bổ sung violation_count cho ${resViolation.modifiedCount} người dùng cũ.`)
+      }
+
+      // 2. Cập nhật role thành 0 (UserRole.User) cho các user chưa có
+      const resRole = await this.users.updateMany(
+        { role: { $exists: false } },
+        { $set: { role: new Int32(0) as any } }
+      )
+      if (resRole.modifiedCount > 0) {
+        console.log(`[Migration] Đã bổ sung role cho ${resRole.modifiedCount} người dùng cũ.`)
+      }
+
+      // 3. Cập nhật fcm_tokens thành [] cho các user chưa có
+      const resFcm = await this.users.updateMany(
+        { fcm_tokens: { $exists: false } },
+        { $set: { fcm_tokens: [] } }
+      )
+      if (resFcm.modifiedCount > 0) {
+        console.log(`[Migration] Đã bổ sung fcm_tokens cho ${resFcm.modifiedCount} người dùng cũ.`)
+      }
+    } catch (error) {
+      console.error('[Migration] Lỗi khi chạy migrateUsersSchema:', error)
     }
   }
   // tạo index cho users collection

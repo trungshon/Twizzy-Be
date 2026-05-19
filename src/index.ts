@@ -26,7 +26,8 @@ import recommendationsRouter from './routes/recommendations.routes'
 // import './utils/fake'
 
 config()
-databaseService.connect().then(() => {
+databaseService.connect().then(async () => {
+  await databaseService.migrateUsersSchema()
   databaseService.indexUsers()
   databaseService.indexRefreshTokens()
   databaseService.indexFollowers()

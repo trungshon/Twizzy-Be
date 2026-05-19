@@ -1127,7 +1127,8 @@ class RecommendationService {
       .toArray()
     const followedUserIds = followers.map((f) => f.followed_user_id)
 
-    if (followedUserIds.length === 0) return
+    // Đưa cả ID của chính người dùng vào danh sách cần reset
+    const resetUserIds = [...followedUserIds, userObjectId]
 
     // 2. Tìm tất cả twizz_id của những người đó mà user đã xem
     // Chúng ta có thể dùng aggregation để join và delete hoặc làm 2 bước
@@ -1149,7 +1150,7 @@ class RecommendationService {
         },
         {
           $match: {
-            'twizz.user_id': { $in: followedUserIds }
+            'twizz.user_id': { $in: resetUserIds }
           }
         },
         {

@@ -393,6 +393,10 @@ Các tiêu chí vi phạm nghiêm cấm:
 2. Nội dung người lớn, khiêu dâm, lỏa thể, quan hệ tình dục.
 3. Kích động bạo động, lời nói thù ghét cực đoan.
 
+QUY TẮC ĐẶC BIỆT VỀ NGỮ CẢNH HỢP LỆ (CHO PHÉP ĐỒ BƠI/BIKINI):
+- Cho phép xuất hiện trang phục đồ bơi, bikini, hoặc trang phục racy (khiêu gợi nhẹ) NẾU ngữ cảnh của video là các môi trường phù hợp như: bãi biển (beach), hồ bơi (pool), bơi lội (swimming), môi trường nước/biển/đại dương (water/sea/ocean), kỳ nghỉ (vacation), bờ biển (coast), bãi cát (sand), khu nghỉ dưỡng (resort) hoặc ngoài trời (outdoor).
+- Coi là vi phạm (nội dung khiêu gợi không phù hợp) nếu mặc đồ bơi, bikini hoặc có hành vi khiêu gợi trong các bối cảnh không hợp lệ (như trong nhà, phòng ngủ, phòng khách, văn phòng, lớp học, hoặc nơi công cộng bình thường không có nước/hồ bơi/bãi biển).
+
 Trả về CHỈ JSON theo định dạng sau (không markdown, không giải thích):
 {
   "is_violation": true/false,
