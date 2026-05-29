@@ -36,31 +36,38 @@ class DatabaseService {
   // Tự động bổ sung các trường bắt buộc của schema đối với các tài khoản cũ trong DB
   async migrateUsersSchema() {
     try {
-      // 1. Cập nhật violation_count thành 0 cho các user chưa có
-      const resViolation = await this.users.updateMany(
-        { violation_count: { $exists: false } },
-        { $set: { violation_count: new Int32(0) as any } }
-      )
-      if (resViolation.modifiedCount > 0) {
-        console.log(`[Migration] Đã bổ sung violation_count cho ${resViolation.modifiedCount} người dùng cũ.`)
-      }
+      const usersToMigrate = await this.users.find({
+        $or: [
+          { violation_count: { $exists: false } },
+          { role: { $exists: false } },
+          { fcm_tokens: { $exists: false } }
+        ]
+      }).toArray()
 
-      // 2. Cập nhật role thành 0 (UserRole.User) cho các user chưa có
-      const resRole = await this.users.updateMany(
-        { role: { $exists: false } },
-        { $set: { role: new Int32(0) as any } }
-      )
-      if (resRole.modifiedCount > 0) {
-        console.log(`[Migration] Đã bổ sung role cho ${resRole.modifiedCount} người dùng cũ.`)
-      }
+      if (usersToMigrate.length > 0) {
+        console.log(`[Migration] Phát hiện ${usersToMigrate.length} người dùng cần bổ sung Schema.`)
+        let migratedCount = 0
+        for (const user of usersToMigrate) {
+          const updateObj: any = {}
+          if (user.violation_count === undefined) {
+            updateObj.violation_count = new Int32(0) as any
+          }
+          if (user.role === undefined) {
+            updateObj.role = new Int32(0) as any
+          }
+          if (user.fcm_tokens === undefined) {
+            updateObj.fcm_tokens = []
+          }
 
-      // 3. Cập nhật fcm_tokens thành [] cho các user chưa có
-      const resFcm = await this.users.updateMany(
-        { fcm_tokens: { $exists: false } },
-        { $set: { fcm_tokens: [] } }
-      )
-      if (resFcm.modifiedCount > 0) {
-        console.log(`[Migration] Đã bổ sung fcm_tokens cho ${resFcm.modifiedCount} người dùng cũ.`)
+          if (Object.keys(updateObj).length > 0) {
+            await this.users.updateOne(
+              { _id: user._id },
+              { $set: updateObj }
+            )
+            migratedCount++
+          }
+        }
+        console.log(`[Migration] Đã bổ sung thành công các trường Schema thiếu cho ${migratedCount} người dùng cũ.`)
       }
     } catch (error) {
       console.error('[Migration] Lỗi khi chạy migrateUsersSchema:', error)

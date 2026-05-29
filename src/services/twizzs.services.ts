@@ -1,7 +1,7 @@
 import { TwizzReqBody } from '~/models/requests/Twizz.requests'
 import databaseService from './database.services'
 import Twizz from '~/models/schemas/Twizz.schema'
-import { ObjectId, WithId } from 'mongodb'
+import { ObjectId, WithId, Double } from 'mongodb'
 import Hashtag from '~/models/schemas/Hashtag.schema'
 import { NotificationType, TwizzAudience, TwizzType } from '~/constants/enum'
 import mediaService from './medias.services'
@@ -28,11 +28,10 @@ class TwizzsService {
   }
   async createTwizz(user_id: string, body: TwizzReqBody) {
     const hashtags = await this.checkAndCreateHashtags(body.hashtags)
-    
-    // Tạo vector cho nội dung bài viết (bao gồm cả text và hashtags)
-    const contentForEmbedding = `${body.content} ${body.hashtags.join(' ')}`
-    const content_vector = await embeddingService.generateEmbedding(contentForEmbedding)
 
+    // Bước 1: Lưu bài viết vào DB ngay lập tức (không đợi tính vector) để phản hồi nhanh cho client
+    // Truyền vector 0 mặc định kiểu Double để vượt qua Schema Validation của MongoDB
+    const defaultVector = new Array(768).fill(0).map(() => new Double(0))
     const result = await databaseService.twizzs.insertOne(
       new Twizz({
         audience: body.audience,
@@ -46,9 +45,24 @@ class TwizzsService {
         user_views: 0,
         created_at: new Date(),
         updated_at: new Date(),
-        content_vector: content_vector // Lưu vector vào DB
+        content_vector: defaultVector as unknown as number[]
       })
     )
+
+    // Bước 2: Tạo vector cho nội dung bài viết và cập nhật ngầm (asynchronously) vào DB
+    const contentForEmbedding = `${body.content} ${body.hashtags.join(' ')}`
+    embeddingService
+      .generateEmbedding(contentForEmbedding)
+      .then((content_vector) => {
+        databaseService.twizzs
+          .updateOne({ _id: result.insertedId }, { $set: { content_vector } })
+          .catch((err) => {
+            console.error(`[Embedding] Lỗi cập nhật content_vector ngầm cho twizz ${result.insertedId}:`, err)
+          })
+      })
+      .catch((err) => {
+        console.error(`[Embedding] Lỗi tạo embedding ngầm cho twizz ${result.insertedId}:`, err)
+      })
     // Populate user info and other data using aggregation
     const twizzs = await databaseService.twizzs
       .aggregate([
@@ -1611,8 +1625,8 @@ class TwizzsService {
       twizz.updated_at = date
       twizz.user_views = twizz.user_views + 1
     })
-    return { 
-      twizzs, 
+    return {
+      twizzs,
       total: total.length > 0 ? total[0].total : 0,
       global_total: global_total_result.length > 0 ? global_total_result[0].total : 0
     }
@@ -1858,37 +1872,37 @@ class TwizzsService {
                 },
                 ...(viewer_user_id_objectId
                   ? [
-                      {
-                        $lookup: {
-                          from: 'likes',
-                          localField: '_id',
-                          foreignField: 'twizz_id',
-                          as: 'user_likes',
-                          pipeline: [
-                            {
-                              $match: {
-                                user_id: viewer_user_id_objectId
-                              }
+                    {
+                      $lookup: {
+                        from: 'likes',
+                        localField: '_id',
+                        foreignField: 'twizz_id',
+                        as: 'user_likes',
+                        pipeline: [
+                          {
+                            $match: {
+                              user_id: viewer_user_id_objectId
                             }
-                          ]
-                        }
-                      },
-                      {
-                        $lookup: {
-                          from: 'bookmarks',
-                          localField: '_id',
-                          foreignField: 'twizz_id',
-                          as: 'user_bookmarks',
-                          pipeline: [
-                            {
-                              $match: {
-                                user_id: viewer_user_id_objectId
-                              }
-                            }
-                          ]
-                        }
+                          }
+                        ]
                       }
-                    ]
+                    },
+                    {
+                      $lookup: {
+                        from: 'bookmarks',
+                        localField: '_id',
+                        foreignField: 'twizz_id',
+                        as: 'user_bookmarks',
+                        pipeline: [
+                          {
+                            $match: {
+                              user_id: viewer_user_id_objectId
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
                   : []),
                 {
                   $addFields: {
@@ -1950,12 +1964,12 @@ class TwizzsService {
               as: 'user_likes',
               pipeline: viewer_user_id_objectId
                 ? [
-                    {
-                      $match: {
-                        user_id: viewer_user_id_objectId
-                      }
+                  {
+                    $match: {
+                      user_id: viewer_user_id_objectId
                     }
-                  ]
+                  }
+                ]
                 : []
             }
           },
@@ -1967,12 +1981,12 @@ class TwizzsService {
               as: 'user_bookmarks',
               pipeline: viewer_user_id_objectId
                 ? [
-                    {
-                      $match: {
-                        user_id: viewer_user_id_objectId
-                      }
+                  {
+                    $match: {
+                      user_id: viewer_user_id_objectId
                     }
-                  ]
+                  }
+                ]
                 : []
             }
           },

@@ -32,7 +32,7 @@ const visionClient = new vision.ImageAnnotatorClient({
 // Sử dụng API key để gọi Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
 const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY as string)
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' })
 
 class ModerationService {
   // ====================================================
@@ -389,7 +389,7 @@ Trả về CHỈ JSON (không markdown, không giải thích thêm):
 Hãy phân tích video này có an toàn hay không.
 
 Các tiêu chí vi phạm nghiêm cấm:
-1. Nội dung bạo lực, máu me, kinh dị thực sự gây sợ hãi.
+1. Nội dung bạo lực, máu me, kinh dị.
 2. Nội dung người lớn, khiêu dâm, lỏa thể, quan hệ tình dục.
 3. Kích động bạo động, lời nói thù ghét cực đoan.
 
