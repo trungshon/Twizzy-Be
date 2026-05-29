@@ -13,7 +13,10 @@ class ConversationsService {
                     sender_id: new ObjectId(receiver_id),
                     receiver_id: new ObjectId(sender_id)
                 }
-            ]
+            ],
+            deleted_by: {
+                $ne: new ObjectId(sender_id)
+            }
         }
         const conversations = await databaseService.conversations.find(match).sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).toArray()
         const total = await databaseService.conversations.countDocuments(match)
@@ -35,12 +38,17 @@ class ConversationsService {
     }
 
     async deleteConversation({ user_id, sender_id }: { user_id: string, sender_id: string }) {
-        await databaseService.conversations.deleteMany({
-            $or: [
-                { sender_id: new ObjectId(sender_id), receiver_id: new ObjectId(user_id) },
-                { sender_id: new ObjectId(user_id), receiver_id: new ObjectId(sender_id) }
-            ]
-        })
+        await databaseService.conversations.updateMany(
+            {
+                $or: [
+                    { sender_id: new ObjectId(sender_id), receiver_id: new ObjectId(user_id) },
+                    { sender_id: new ObjectId(user_id), receiver_id: new ObjectId(sender_id) }
+                ]
+            },
+            {
+                $addToSet: { deleted_by: new ObjectId(user_id) }
+            }
+        )
     }
 
     async markAsRead({ user_id, sender_id }: { user_id: string, sender_id: string }) {
@@ -64,7 +72,10 @@ class ConversationsService {
                     $or: [
                         { sender_id: userId },
                         { receiver_id: userId }
-                    ]
+                    ],
+                    deleted_by: {
+                        $ne: userId
+                    }
                 }
             },
             {
