@@ -15,7 +15,7 @@ import embeddingService from '~/services/embedding.services'
  */
 
 const SEED_TAG = 'seed_reco_2026'
-const PASSWORD = 'Aa1!aaaa'
+const PASSWORD = 'Ct060136@'
 
 // Danh sách các chủ đề
 const TOPICS = ['football', 'cooking', 'tech', 'movie', 'travel', 'music', 'finance', 'health', 'astronomy'] as const
@@ -459,9 +459,15 @@ async function createUser(key: string) {
   return userId
 }
 
+// Helper sinh ngày ngẫu nhiên trong quá khứ để phục vụ test Time Decay
+function randomDateInPast(maxDays: number): Date {
+  return new Date(Date.now() - Math.random() * maxDays * 24 * 60 * 60 * 1000)
+}
+
 async function createTwizz(authorId: ObjectId, topic: Topic, createdAt?: Date) {
   const content = contentPool.getNext(topic)
-  const now = createdAt ?? new Date()
+  // Random hóa ngày tạo bài viết trong 10 ngày qua nếu không truyền cụ thể
+  const now = createdAt ?? randomDateInPast(10)
 
   // Tự động bóc tách hashtag từ chuỗi
   const hashtags = await extractAndUpsertHashtags(content)
@@ -565,8 +571,8 @@ async function main() {
   await databaseService.twizzs.insertMany(twizzDocs)
 
   console.log('[seed] Setup test interactions...')
-  // Cold Follow: follow 3 bg users
-  await Promise.all(bgUsers.slice(0, 3).map(id => databaseService.followers.insertOne(new Follower({ user_id: userColdFollow, followed_user_id: id, created_at: new Date() }))))
+  // Cold Follow: follow 3 bg users (tạo từ 7 ngày trước)
+  await Promise.all(bgUsers.slice(0, 3).map(id => databaseService.followers.insertOne(new Follower({ user_id: userColdFollow, followed_user_id: id, created_at: randomDateInPast(7) }))))
 
   // 1. Kho bài viết cho các chủ đề test
   const techPosts = twizzPool.filter(p => p.topic === 'tech')
@@ -574,66 +580,73 @@ async function main() {
   const financePosts = twizzPool.filter(p => p.topic === 'finance')
   const healthPosts = twizzPool.filter(p => p.topic === 'health')
 
-  // 2. User Content Active: Thích cả Tech và Cooking (Đa sở thích, nhiều tương tác)
+  // 2. User Content Active: Thích cả Tech và Cooking (Thiết kế kịch bản dịch chuyển sở thích - Interest Drift)
+  // - Lịch sử: Thích 12 bài Tech từ 5 ngày trước (đã cũ, decay mạnh)
+  // - Gần đây: Thích 10 bài Cooking trong vòng 24 giờ qua (mới tinh, giữ nguyên weight)
+  // Vector sở thích cuối cùng sẽ bị chi phối nhiều bởi Cooking dù số lượng tương tác Tech nhiều hơn.
   for (const p of techPosts.slice(0, 12)) {
-    await databaseService.likes.insertOne(new Like({ user_id: userContentActive, twizz_id: p._id, created_at: new Date() }))
+    const oldDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) // 5 ngày trước
+    await databaseService.likes.insertOne(new Like({ user_id: userContentActive, twizz_id: p._id, created_at: oldDate }))
   }
   for (const p of cookPosts.slice(0, 10)) {
-    await databaseService.likes.insertOne(new Like({ user_id: userContentActive, twizz_id: p._id, created_at: new Date() }))
+    const freshDate = randomDateInPast(1) // Trong vòng 24 giờ qua
+    await databaseService.likes.insertOne(new Like({ user_id: userContentActive, twizz_id: p._id, created_at: freshDate }))
     if (Math.random() > 0.5) await createComment(userContentActive, p._id)
   }
 
-  // 3. Nhóm BG thích Tech → tạo trending cho bài Tech + Finance
+  // 3. Nhóm BG thích Tech → tạo trending cho bài Tech + Finance (tương tác rải rác trong 7 ngày)
   const groupTech = bgUsers.slice(0, 5)
   for (const bgId of groupTech) {
     for (const p of faker.helpers.arrayElements(techPosts.slice(0, 12), 8)) {
-      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
+      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: randomDateInPast(7) }))
     }
     for (const p of financePosts.slice(0, 8)) {
-      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
+      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: randomDateInPast(7) }))
     }
   }
 
-  // 4. Nhóm BG thích Cooking → tạo trending cho bài Cooking + Health
+  // 4. Nhóm BG thích Cooking → tạo trending cho bài Cooking + Health (tương tác rải rác trong 7 ngày)
   const groupCook = bgUsers.slice(5, 10)
   for (const bgId of groupCook) {
     for (const p of faker.helpers.arrayElements(cookPosts.slice(0, 10), 7)) {
-      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
+      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: randomDateInPast(7) }))
     }
     for (const p of healthPosts.slice(0, 8)) {
-      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: new Date() }))
+      await databaseService.likes.insertOne(new Like({ user_id: bgId, twizz_id: p._id, created_at: randomDateInPast(7) }))
     }
   }
 
-  // 5. Các tương tác khác để tạo Trending đa dạng
+  // 5. Các tương tác khác để tạo Trending đa dạng (tương tác rải rác trong 7 ngày)
   const remainingPosts = twizzPool.slice(15, 40)
   for (const bg of bgUsers.slice(10, 20)) {
     for (const post of faker.helpers.arrayElements(remainingPosts, 3)) {
-      await databaseService.likes.insertOne(new Like({ user_id: bg, twizz_id: post._id, created_at: new Date() }))
+      await databaseService.likes.insertOne(new Like({ user_id: bg, twizz_id: post._id, created_at: randomDateInPast(7) }))
     }
   }
 
   // 6. User Content Warm (Travel) — THỨ 2: WARM UP (30:70)
-  // Chỉ 2 like → effectiveCount < 5 → Tỷ lệ Content 30%
+  // Chỉ 2 like trong 2 ngày qua
   const travelPosts = twizzPool.filter(p => p.topic === 'travel').slice(0, 2)
   for (const p of travelPosts) {
-    await databaseService.likes.insertOne(new Like({ user_id: userContentWarm, twizz_id: p._id, created_at: new Date() }))
+    await databaseService.likes.insertOne(new Like({ user_id: userContentWarm, twizz_id: p._id, created_at: randomDateInPast(2) }))
   }
 
   // 7. User Content Only (Football) — THỨ 3: ACTIVE (70:30)
-  // Đúng 5 like → effectiveCount >= 5 → Tỷ lệ Content 70%
+  // Đúng 5 like trong 2 ngày qua
   const fbPosts = twizzPool.filter(p => p.topic === 'football').slice(0, 5)
-  for (const p of fbPosts) await databaseService.likes.insertOne(new Like({ user_id: userContentOnly, twizz_id: p._id, created_at: new Date() }))
+  for (const p of fbPosts) {
+    await databaseService.likes.insertOne(new Like({ user_id: userContentOnly, twizz_id: p._id, created_at: randomDateInPast(2) }))
+  }
 
-  // Content Niche (Astronomy) — user thích chủ đề hiếm
+  // Content Niche (Astronomy) — user thích chủ đề hiếm (tương tác rải rác trong 5 ngày)
   console.log('[seed] Creating niche pool (Astronomy)...')
   const nicheAuthor = bgUsers[bgUsers.length - 1]
   const nicheDocs: Twizz[] = []
   for (let i = 0; i < 25; i++) {
-    const t = await createTwizz(nicheAuthor, 'astronomy')
+    const t = await createTwizz(nicheAuthor, 'astronomy', randomDateInPast(5))
     nicheDocs.push(t)
     if (i < 15) {
-      if (i < 10) await databaseService.likes.insertOne(new Like({ user_id: userContentNiche, twizz_id: t._id as ObjectId, created_at: new Date() }))
+      if (i < 10) await databaseService.likes.insertOne(new Like({ user_id: userContentNiche, twizz_id: t._id as ObjectId, created_at: randomDateInPast(5) }))
       else await createComment(userContentNiche, t._id as ObjectId)
     }
   }

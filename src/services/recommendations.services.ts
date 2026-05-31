@@ -931,8 +931,8 @@ class RecommendationService {
                   { $multiply: ['$quote_count', TRENDING_WEIGHTS.quote] }
                 ]
               },
-              // Phần B: Hệ số suy giảm (Gravity) - Bài càng cũ thì chia cho số càng lớn -> điểm càng thấp
-              { $divide: [1, { $add: [1, '$days_ago'] }] }
+              // Phần B: Hệ số suy giảm (Gravity) - Bài càng cũ thì chia cho số càng lớn -> điểm càng thấp (chu kỳ bán rã 3 ngày)
+              { $divide: [3, { $add: [3, '$days_ago'] }] }
             ]
           }
         }

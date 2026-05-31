@@ -20,14 +20,20 @@ const INTERACTION_WEIGHTS = {
   quote: 1.5
 }
 
-// Chu kỳ bán rã cho Content-Based (7 ngày).
-const CONTENT_DECAY_HALFLIFE_DAYS = 7
+// Chu kỳ bán rã cho Content-Based (3 ngày).
+const CONTENT_DECAY_HALFLIFE_DAYS = 3
 
 // Giới hạn trần tổng trọng số tương tác để tránh trơ vector sở thích
 const MAX_WEIGHT_CAP = 100.0
 
-// Khoảng thời gian định kỳ để tính toán lại toàn bộ lịch sử (7 ngày)
-const RECALCULATE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000
+// Khoảng thời gian định kỳ để tính toán lại toàn bộ lịch sử (3 ngày)
+const RECALCULATE_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000
+
+// Giới hạn dưới của hệ số thời gian (Time Decay Floor) để bài cũ chất lượng không bị bài mới không liên quan đè bẹp
+const DECAY_FLOOR = 0.7
+
+// Ngưỡng tương đồng tối thiểu để lọc ra những bài viết thực sự liên quan đến sở thích
+const MIN_SIMILARITY_THRESHOLD = 0.7
 
 class ContentBasedService {
   constructor() {
@@ -41,7 +47,7 @@ class ContentBasedService {
   async getRecommendations(userId: string, limit: number, externalExcludeIds?: Set<string>): Promise<ContentBasedResult[]> {
     recoLog('ContentBased', 'Bắt đầu getRecommendations (Semantic)', { userId, limit })
 
-    // 1. Kiểm tra và tự động tính toán lại vector sở thích nếu đã quá hạn 7 ngày (Lazy Update)
+    // 1. Kiểm tra và tự động tính toán lại vector sở thích nếu đã quá hạn 3 ngày (Lazy Update)
     await this.checkAndRecalculateUserVector(userId)
 
     // 2. Lấy vector sở thích của User từ DB
@@ -49,7 +55,7 @@ class ContentBasedService {
       { _id: new ObjectId(userId) },
       { projection: { interest_vector: 1 } }
     )
-    
+
     const userVector = user?.interest_vector || new Array(768).fill(0)
 
     // Nếu người dùng chưa từng tương tác (vector toàn 0), trả về rỗng để chuyển sang pool Trending/Following
@@ -125,16 +131,33 @@ class ContentBasedService {
           vectorScore: { $meta: 'vectorSearchScore' }
         }
       },
+      // Chỉ giữ lại các bài viết thực sự liên quan (tránh đẩy bài mới nhưng lạc đề)
+      {
+        $match: {
+          vectorScore: { $gte: MIN_SIMILARITY_THRESHOLD }
+        }
+      },
       {
         $addFields: {
-          // Công thức: FinalScore = VectorScore * (Halflife / (Halflife + days_ago))
+          // Công thức: FinalScore = VectorScore * (DECAY_FLOOR + (1 - DECAY_FLOOR) * (Halflife / (Halflife + days_ago)))
+          // Điều này giúp điểm của bài viết cũ chất lượng cao nhất không bao giờ bị giảm quá sâu (giới hạn giảm tối đa là DECAY_FLOOR = 0.6)
           decayedScore: {
             $multiply: [
               '$vectorScore',
               {
-                $divide: [
-                  CONTENT_DECAY_HALFLIFE_DAYS,
-                  { $add: [CONTENT_DECAY_HALFLIFE_DAYS, '$days_ago'] }
+                $add: [
+                  DECAY_FLOOR,
+                  {
+                    $multiply: [
+                      1 - DECAY_FLOOR,
+                      {
+                        $divide: [
+                          CONTENT_DECAY_HALFLIFE_DAYS,
+                          { $add: [CONTENT_DECAY_HALFLIFE_DAYS, '$days_ago'] }
+                        ]
+                      }
+                    ]
+                  }
                 ]
               }
             ]
@@ -160,7 +183,7 @@ class ContentBasedService {
   }
 
   /**
-   * Kiểm tra xem vector sở thích của User đã quá hạn 7 ngày chưa.
+   * Kiểm tra xem vector sở thích của User đã quá hạn 3 ngày chưa.
    * Nếu đã quá hạn hoặc chưa có, tự động tính toán lại định kỳ (Lazy Update).
    */
   async checkAndRecalculateUserVector(userId: string): Promise<void> {
@@ -174,11 +197,11 @@ class ContentBasedService {
     const now = new Date()
     const lastUpdate = user.interest_vector_updated_at
 
-    // Kiểm tra xem đã qua 7 ngày chưa
+    // Kiểm tra xem đã qua 3 ngày chưa
     const isStale = !lastUpdate || (now.getTime() - lastUpdate.getTime() >= RECALCULATE_INTERVAL_MS)
 
     if (isStale) {
-      recoLog('ContentBased', 'Lazy Update: Cập nhật định kỳ vector sở thích (7 ngày) từ lịch sử', { userId })
+      recoLog('ContentBased', 'Lazy Update: Cập nhật định kỳ vector sở thích (3 ngày) từ lịch sử', { userId })
       try {
         await this.recalculateUserInterestVector(userId)
       } catch (err) {
@@ -347,7 +370,7 @@ class ContentBasedService {
           }
         }
       )
-      
+
       recoLog('ContentBased', 'Cập nhật lũy tiến thành công (Real-time)', {
         userId,
         twizzId,
