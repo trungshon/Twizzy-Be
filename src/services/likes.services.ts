@@ -4,6 +4,7 @@ import Like from '~/models/schemas/Like.schema'
 import { NotificationType, TwizzType } from '~/constants/enum'
 import notificationsService from './notifications.services'
 import recommendationService from './recommendations.services'
+import contentBasedService from './contentBased.services'
 
 class LikesService {
   async likeTwizz(user_id: string, twizz_id: string) {
@@ -15,6 +16,11 @@ class LikesService {
 
     // Xóa cache gợi ý của user vì hành vi tương tác đã thay đổi
     recommendationService.invalidateUserCache(user_id)
+
+    // Cập nhật lũy tiến vector sở thích của user khi có tương tác Like mới (bất đồng bộ)
+    contentBasedService.updateUserProfileIncremental(user_id, twizz_id, 'like').catch((err) => {
+      console.error('Lỗi cập nhật incremental vector sở thích khi like:', err)
+    })
 
     // Trigger notification
     if (result) {

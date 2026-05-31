@@ -11,6 +11,7 @@ import { ErrorWithStatus } from '~/models/Errors'
 import { TWIZZ_MESSAGES } from '~/constants/messages'
 import recommendationService from './recommendations.services'
 import embeddingService from './embedding.services'
+import contentBasedService from './contentBased.services'
 
 class TwizzsService {
   async checkAndCreateHashtags(hashtags: string[]) {
@@ -366,6 +367,16 @@ class TwizzsService {
     // Xóa cache gợi ý của user khi họ tạo comment hoặc quote (tương tác mới ảnh hưởng đến profile)
     if (finalResult.type === TwizzType.Comment || finalResult.type === TwizzType.QuoteTwizz) {
       recommendationService.invalidateUserCache(user_id)
+
+      // Cập nhật lũy tiến vector sở thích của user khi viết bình luận hoặc trích dẫn mới (bất đồng bộ)
+      if (finalResult.parent_id) {
+        const interactionType = finalResult.type === TwizzType.Comment ? 'comment' : 'quote'
+        contentBasedService
+          .updateUserProfileIncremental(user_id, finalResult.parent_id.toString(), interactionType)
+          .catch((err) => {
+            console.error('Lỗi cập nhật incremental vector sở thích khi comment/quote:', err)
+          })
+      }
     }
 
     // Trigger notification for Comment or QuoteTwizz

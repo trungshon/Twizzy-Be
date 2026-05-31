@@ -609,18 +609,20 @@ class RecommendationService {
     let trendingItems: ScoredItem[] = []
 
     if (followingCount > 0) {
-      // Lấy following (70% pool) và trending (30% pool)
+      // Lấy following tối đa theo tỉ lệ (70% pool)
       const followingLimit = Math.ceil(poolSize * COLD_START_FOLLOW_WEIGHTS.following)
-      const trendingLimit = poolSize - followingLimit
 
       recoLog('Orchestrator', 'Cold Start: user có follow → following + trending', {
         userId,
         followingCount,
-        followingLimit,
-        trendingLimit
+        followingLimit
       })
 
       followingItems = await this.getFollowingTwizzs(userId, followingLimit, interactedIds)
+
+      // Tính toán động trendingLimit để bù đắp phần thiếu hụt của following (đảm bảo đủ poolSize bài viết)
+      const trendingLimit = Math.max(0, poolSize - followingItems.length)
+
       const excludeIds = new Set([...interactedIds, ...followingItems.map((t) => t.twizz_id.toString())])
       trendingItems = await this.getTrendingTwizzs(userId, trendingLimit, excludeIds)
 
@@ -673,16 +675,14 @@ class RecommendationService {
     startTime: number,
     ratio: number
   ): Promise<InternalResult> {
-    // Lấy content (theo ratio) và trending (phần còn lại)
+    // Lấy content tối đa theo tỉ lệ
     const contentLimit = Math.ceil(poolSize * ratio)
-    const trendingLimit = poolSize - contentLimit
 
     recoLog('Orchestrator', 'Content+Trending: gọi song song', {
       userId,
       poolSize,
       pageLimit,
-      contentLimit,
-      trendingLimit
+      contentLimit
     })
 
     const contentResults = await contentBasedService.getRecommendations(userId, contentLimit, interactedIds)
@@ -693,6 +693,9 @@ class RecommendationService {
       reason: r.reason,
       algorithm: 'content' as const
     }))
+
+    // Tính toán động trendingLimit để bù đắp phần thiếu hụt của content-based (đảm bảo đủ poolSize bài viết)
+    const trendingLimit = Math.max(0, poolSize - contentItems.length)
 
     // Trending lấy thêm, loại trùng với content và bài đã tương tác
     const excludeIds = new Set([...interactedIds, ...contentItems.map((t) => t.twizz_id.toString())])

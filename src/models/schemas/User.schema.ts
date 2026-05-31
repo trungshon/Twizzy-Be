@@ -30,6 +30,8 @@ interface UserType {
   violation_count?: number
   fcm_tokens?: string[] // FCM token cho push notification
   interest_vector?: number[]
+  total_interaction_weight?: number
+  interest_vector_updated_at?: Date
 }
 
 export default class User {
@@ -61,6 +63,8 @@ export default class User {
   violation_count: number
   fcm_tokens: string[]
   interest_vector?: number[] // Vector 768 chiều biểu diễn sở thích người dùng
+  total_interaction_weight?: number // Tổng trọng số tương tác của người dùng
+  interest_vector_updated_at?: Date // Thời điểm tính toán lại vector sở thích từ toàn bộ lịch sử
 
   constructor(user: UserType) {
     const date = new Date()
@@ -91,6 +95,8 @@ export default class User {
     this.violation_count = user.violation_count || 0
     this.fcm_tokens = user.fcm_tokens || []
     this.interest_vector = user.interest_vector // Lưu vector nếu có
+    this.total_interaction_weight = user.total_interaction_weight
+    this.interest_vector_updated_at = user.interest_vector_updated_at
   }
 }
 
