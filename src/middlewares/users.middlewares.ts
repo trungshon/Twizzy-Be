@@ -557,6 +557,13 @@ export const updateMeValidator = validate(
             return true
           }
         }
+      },
+      notification_setting: {
+        optional: true,
+        isIn: {
+          options: [[0, 1, 2]],
+          errorMessage: 'Cài đặt nhận thông báo không hợp lệ'
+        }
       }
     },
     ['body']

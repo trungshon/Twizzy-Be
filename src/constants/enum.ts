@@ -69,3 +69,9 @@ export enum ReportStatus {
   Resolved,
   Ignored
 }
+
+export enum NotificationSetting {
+  Everyone, // 0
+  Following, // 1
+  Off // 2
+}

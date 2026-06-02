@@ -2137,6 +2137,51 @@ class TwizzsService {
 
     return { message: TWIZZ_MESSAGES.DELETE_TWIZZ_SUCCESSFULLY }
   }
+
+  async unmention(twizz_id: string, user_id: string) {
+    const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+    if (!user) {
+      throw new ErrorWithStatus({
+        message: 'Người dùng không tồn tại',
+        status: HTTP_STATUS.NOT_FOUND
+      })
+    }
+
+    const twizz = await databaseService.twizzs.findOne({ _id: new ObjectId(twizz_id) })
+    if (!twizz) {
+      throw new ErrorWithStatus({
+        message: TWIZZ_MESSAGES.TWIZZ_NOT_EXISTS,
+        status: HTTP_STATUS.NOT_FOUND
+      })
+    }
+
+    // Gỡ kí tự @ trước username của người dùng này trong content
+    const updatedContent = twizz.content.replace(new RegExp(`@${user.username}\\b`, 'gi'), user.username)
+
+    const result = await databaseService.twizzs.updateOne(
+      { _id: new ObjectId(twizz_id) },
+      {
+        $pull: { mentions: new ObjectId(user_id) },
+        $set: { content: updatedContent }
+      }
+    )
+
+    if (result.matchedCount === 0) {
+      throw new ErrorWithStatus({
+        message: TWIZZ_MESSAGES.TWIZZ_NOT_EXISTS,
+        status: HTTP_STATUS.NOT_FOUND
+      })
+    }
+
+    // Xóa notification liên quan đến mention này
+    await databaseService.notifications.deleteOne({
+      user_id: new ObjectId(user_id),
+      twizz_id: new ObjectId(twizz_id),
+      type: NotificationType.Mention
+    })
+
+    return { message: TWIZZ_MESSAGES.UNMENTION_SUCCESSFULLY }
+  }
 }
 
 const twizzsService = new TwizzsService()

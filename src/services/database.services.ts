@@ -40,7 +40,8 @@ class DatabaseService {
         $or: [
           { violation_count: { $exists: false } },
           { role: { $exists: false } },
-          { fcm_tokens: { $exists: false } }
+          { fcm_tokens: { $exists: false } },
+          { notification_setting: { $exists: false } }
         ]
       }).toArray()
 
@@ -57,6 +58,9 @@ class DatabaseService {
           }
           if (user.fcm_tokens === undefined) {
             updateObj.fcm_tokens = []
+          }
+          if (user.notification_setting === undefined) {
+            updateObj.notification_setting = 0 // NotificationSetting.Everyone
           }
 
           if (Object.keys(updateObj).length > 0) {

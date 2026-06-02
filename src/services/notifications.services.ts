@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb'
 import databaseService from './database.services'
 import Notification from '~/models/schemas/Notification.schema'
-import { NotificationType, TwizzType, TwizzAudience } from '~/constants/enum'
+import { NotificationType, TwizzType, TwizzAudience, NotificationSetting } from '~/constants/enum'
 import { io, users } from '~/utils/socket'
 import firebaseService from './firebase.services'
 
@@ -13,6 +13,37 @@ class NotificationsService {
         twizz_id?: string
         metadata?: any
     }) {
+        const systemNotificationTypes = [
+            NotificationType.ReportResolved,
+            NotificationType.ReportIgnored,
+            NotificationType.PostDeleted,
+            NotificationType.AccountBanned
+        ]
+
+        if (!systemNotificationTypes.includes(payload.type)) {
+            const recipient = await databaseService.users.findOne({ _id: new ObjectId(payload.user_id) })
+            if (!recipient) {
+                return null
+            }
+
+            const setting = recipient.notification_setting ?? NotificationSetting.Everyone
+
+            if (setting === NotificationSetting.Off) {
+                return null
+            }
+
+            if (setting === NotificationSetting.Following) {
+                const isFollowing = await databaseService.followers.findOne({
+                    user_id: new ObjectId(payload.user_id),
+                    followed_user_id: new ObjectId(payload.sender_id)
+                })
+
+                if (!isFollowing) {
+                    return null
+                }
+            }
+        }
+
         const filter: any = {
             user_id: new ObjectId(payload.user_id),
             sender_id: new ObjectId(payload.sender_id),

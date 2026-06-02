@@ -147,3 +147,9 @@ export const deleteTwizzController = async (req: Request<TwizzParam>, res: Respo
     message: TWIZZ_MESSAGES.DELETE_TWIZZ_SUCCESSFULLY
   })
 }
+
+export const unmentionController = async (req: Request<TwizzParam>, res: Response) => {
+  const { user_id } = req.decoded_authorization as TokenPayload
+  const result = await twizzsService.unmention(req.params.twizz_id, user_id)
+  return res.json(result)
+}

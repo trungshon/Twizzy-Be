@@ -1,5 +1,5 @@
 import { JwtPayload } from 'jsonwebtoken'
-import { TokenType, UserRole, UserVerifyStatus } from '~/constants/enum'
+import { TokenType, UserRole, UserVerifyStatus, NotificationSetting } from '~/constants/enum'
 import { ParamsDictionary } from 'express-serve-static-core'
 
 export interface RegisterReqBody {
@@ -49,6 +49,7 @@ export interface UpdateMeReqBody {
   avatar?: string
   cover_photo?: string
   twizz_circle?: string[]
+  notification_setting?: NotificationSetting
 }
 
 export interface FollowReqBody {

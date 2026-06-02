@@ -5,7 +5,8 @@ import {
   getTwizzChildrenController,
   getTwizzController,
   getUserTwizzsController,
-  deleteTwizzController
+  deleteTwizzController,
+  unmentionController
 } from '~/controllers/twizzs.controllers'
 import { accessTokenValidator, isUserLoggedInValidator, verifiedUserValidator } from '~/middlewares/users.middlewares'
 import wrapRequestHandler from '~/utils/handlers'
@@ -138,6 +139,22 @@ twizzsRouter.delete(
   // verifiedUserValidator,
   audienceValidator,
   wrapRequestHandler(deleteTwizzController)
+)
+
+/**
+ * @description Remove self mention from a twizz
+ * @path /:twizz_id/mentions
+ * @method DELETE
+ * @header {
+ *   Authorization: Bearer <access_token>
+ * }
+ */
+twizzsRouter.delete(
+  '/:twizz_id/mentions',
+  twizzIdValidator,
+  accessTokenValidator,
+  audienceValidator,
+  wrapRequestHandler(unmentionController)
 )
 
 export default twizzsRouter

@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb'
-import { UserVerifyStatus, UserRole } from '~/constants/enum'
+import { UserVerifyStatus, UserRole, NotificationSetting } from '~/constants/enum'
 
 interface UserType {
   _id?: ObjectId
@@ -32,6 +32,7 @@ interface UserType {
   interest_vector?: number[]
   total_interaction_weight?: number
   interest_vector_updated_at?: Date
+  notification_setting?: NotificationSetting
 }
 
 export default class User {
@@ -65,6 +66,7 @@ export default class User {
   interest_vector?: number[] // Vector 768 chiều biểu diễn sở thích người dùng
   total_interaction_weight?: number // Tổng trọng số tương tác của người dùng
   interest_vector_updated_at?: Date // Thời điểm tính toán lại vector sở thích từ toàn bộ lịch sử
+  notification_setting: NotificationSetting
 
   constructor(user: UserType) {
     const date = new Date()
@@ -97,6 +99,7 @@ export default class User {
     this.interest_vector = user.interest_vector // Lưu vector nếu có
     this.total_interaction_weight = user.total_interaction_weight
     this.interest_vector_updated_at = user.interest_vector_updated_at
+    this.notification_setting = user.notification_setting ?? NotificationSetting.Everyone
   }
 }
 

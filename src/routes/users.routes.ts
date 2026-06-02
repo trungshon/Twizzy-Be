@@ -225,7 +225,8 @@ usersRouter.patch(
     'username',
     'avatar',
     'cover_photo',
-    'twizz_circle'
+    'twizz_circle',
+    'notification_setting'
   ]),
   wrapRequestHandler(updateMeController)
 )

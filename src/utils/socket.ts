@@ -1,6 +1,6 @@
 import { Server as ServerHttp } from "http"
 import { ObjectId } from "mongodb"
-import { UserVerifyStatus } from "~/constants/enum"
+import { UserVerifyStatus, NotificationSetting } from "~/constants/enum"
 import { HTTP_STATUS } from "~/constants/httpStatus"
 import { USER_MESSAGES } from "~/constants/messages"
 import { ErrorWithStatus } from "~/models/Errors"
@@ -131,23 +131,38 @@ const initSocket = (httpServer: ServerHttp) => {
                 }
             }
 
-            if (receiver_socket_id) {
-                socket.to(receiver_socket_id).emit('receive_message', messagePayload)
-            } else {
-                // Người nhận không online → gửi FCM push notification
-                await firebaseService.sendNotification({
-                    user_id: receiver_id,
-                    title: sender?.name || 'Tin nhắn mới',
-                    body: content || (medias?.length > 0 ? (medias[0].type === 0 ? 'Đã gửi ảnh' : 'Đã gửi video') : 'Tin nhắn mới'),
-                    data: {
-                        type: 'message',
-                        sender_id: sender_id,
-                        sender_name: sender?.name || '',
-                        sender_username: sender?.username || '',
-                        sender_avatar: sender?.avatar || '',
-                        conversation_id: conversation._id!.toString(),
-                    }
-                })
+            const receiverUser = await databaseService.users.findOne({ _id: new ObjectId(receiver_id) })
+            const receiverSetting = receiverUser?.notification_setting ?? NotificationSetting.Everyone
+
+            let shouldSend = true
+            if (receiverSetting === NotificationSetting.Off) {
+                shouldSend = false
+            } else if (receiverSetting === NotificationSetting.Following) {
+                // isFollower check (receiver follows sender)
+                if (!isFollower) {
+                    shouldSend = false
+                }
+            }
+
+            if (shouldSend) {
+                if (receiver_socket_id) {
+                    socket.to(receiver_socket_id).emit('receive_message', messagePayload)
+                } else {
+                    // Người nhận không online → gửi FCM push notification
+                    await firebaseService.sendNotification({
+                        user_id: receiver_id,
+                        title: sender?.name || 'Tin nhắn mới',
+                        body: content || (medias?.length > 0 ? (medias[0].type === 0 ? 'Đã gửi ảnh' : 'Đã gửi video') : 'Tin nhắn mới'),
+                        data: {
+                            type: 'message',
+                            sender_id: sender_id,
+                            sender_name: sender?.name || '',
+                            sender_username: sender?.username || '',
+                            sender_avatar: sender?.avatar || '',
+                            conversation_id: conversation._id!.toString(),
+                        }
+                    })
+                }
             }
             // Also emit back to the sender for confirmation/UI update
             socket.emit('receive_message', messagePayload)
