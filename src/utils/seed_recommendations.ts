@@ -56,7 +56,32 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Những bàn thắng từ xa luôn mang lại cảm giác cực kỳ phấn khích. #goals",
     "Sự kết hợp giữa kinh nghiệm và sức trẻ đang mang lại thành công.",
     "Áp lực của việc đá luân lưu 11m thực sự là thử thách tâm lý cực đại.",
-    "Bóng đá nữ Việt Nam đang ngày càng khẳng định vị thế trên bản đồ thế giới. #Vietnam"
+    "Bóng đá nữ Việt Nam đang ngày càng khẳng định vị thế trên bản đồ thế giới. #Vietnam",
+    "Cuối tuần này lại chuẩn bị thức đêm xem Ngoại hạng Anh rồi, cuộc đua vô địch năm nay căng thẳng quá! #PremierLeague #EPL",
+    "Ronaldo vẫn nổ súng đều đặn, đúng là gừng càng già càng cay! #CR7 #Ronaldo",
+    "Bóng đá phong trào ở Việt Nam ngày càng phát triển chuyên nghiệp, các giải phủi đông vui không kém gì V-League. #bongdaphui",
+    "Phân tích lối đá kiểm soát bóng của Pep Guardiola tại Man City, đúng là bậc thầy chiến thuật. #Pep #ManCity",
+    "Kỳ chuyển nhượng mùa đông này các CLB đang mua sắm khá im hơi lặng tiếng. #transferwindow",
+    "Đá bóng xong làm cốc trà đá vỉa hè chém gió thì đúng là combo bất hủ của cánh mày râu. #footballlife",
+    "Giày đá bóng sân cỏ nhân tạo hãng nào đi êm chân và bám sân tốt nhất hả mọi người? Xin review! #giaydabong",
+    "Không khí trên khán đài hôm nay cuồng nhiệt quá, cổ động viên đốt pháo sáng rực một góc sân. #ultras #footballfans",
+    "Những quả tạt cánh đánh đầu vẫn là bài tấn công cổ điển nhưng cực kỳ hiệu quả của bóng đá Anh. #cross #headers",
+    "Trận đấu bị gián đoạn gần 5 phút chỉ để trọng tài check VAR một tình huống penalty nhạy cảm. #VAR",
+    "HLV tạm quyền đang làm quá tốt vai trò của mình, giúp đội bóng có chuỗi 5 trận thắng liên tiếp.",
+    "Xem bóng đá mà thiếu đi đĩa lạc luộc với cốc bia hơi thì mất đi một nửa cái thú vị rồi. #footballmatch",
+    "Thủ môn hôm nay chơi như lên đồng, cản phá thành công quả penalty ở phút bù giờ quyết định. #hero #clean-sheet",
+    "Tình huống phản công nhanh mẫu mực, chỉ cần 3 đường chuyền bóng đã nằm gọn trong lưới đối phương. #counterattack",
+    "Bàn thắng solo từ giữa sân quá đẳng cấp, ứng cử viên nặng ký cho giải Puskas năm nay! #Puskas #goal",
+    "Đội hình dự bị của Real Madrid vẫn quá mạnh so với phần còn lại của giải đấu. #RealMadrid #HalaMadrid",
+    "Đang đá bóng mà gặp trời mưa rào thì đúng là trải nghiệm nhớ đời, ướt sũng nhưng vui. #rainymatch",
+    "Arsenal mùa này đá sân khách bản lĩnh hơn hẳn, không còn dễ bị bắt nạt như trước. #Arsenal #COYG",
+    "Lối chơi phòng ngự phản công trứ danh của Jose Mourinho vẫn luôn có chỗ đứng trong lịch sử bóng đá. #Mourinho #defensive",
+    "Tấm thẻ đỏ trực tiếp từ đầu hiệp 1 đã làm phá sản hoàn toàn ý đồ chiến thuật của toàn đội.",
+    "Bóng đá trẻ Việt Nam cần được đầu tư nhiều hơn nữa vào cơ sở vật chất và dinh dưỡng để cải thiện thể lực.",
+    "Lịch thi đấu dày đặc thế này bảo sao các trụ cột không liên tiếp gặp chấn thương quá tải. #fixturecongestion",
+    "Chelsea vẫn đang trong giai đoạn chuyển giao đầy bất ổn, chưa thấy lối ra cho CLB. #Chelsea #CFC",
+    "Huyền thoại bóng đá thế giới giải nghệ để lại bao tiếc nuối cho người hâm mộ trên khắp hành tinh. #legend #retire",
+    "Một trận hòa quả cảm trên sân khách là lợi thế cực lớn cho trận lượt về sắp tới. #draw #awaygoal"
   ],
   tech: [
     "Vừa trải nghiệm thử Vision Pro, cảm giác không gian thực tế ảo thực sự rất khác biệt. #VisionPro #Apple",
@@ -98,7 +123,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Phân tích dữ liệu lớn (Big Data) giúp đưa ra quyết định kinh doanh chính xác. #BigData",
     "Những kiến thức cơ bản về mạng máy tính mà developer nào cũng cần biết.",
     "Tương lai của nghề Frontend Developer giữa cơn bão AI.",
-    "Review các dòng laptop gaming giá rẻ nhưng cấu hình cực khủng. #GamingLaptop"
+    "Review các dòng laptop gaming giá rẻ nhưng cấu hình cực khủng. #GamingLaptop",
+    "Học lập trình không khó, cái khó là kiên trì debug qua những ngày code chạy không như ý. #programmer #codelife",
+    "React 19 mang đến nhiều tính năng tối ưu hóa render cực đỉnh, mọi người đã thử chưa? #ReactJS #frontend",
+    "Xây dựng dự án cá nhân bằng Next.js kết hợp Tailwind CSS đúng là nhanh như gió. #Nextjs #TailwindCSS",
+    "Docker giúp giải quyết triệt để vấn đề 'code chạy trên máy tôi nhưng không chạy trên production'. #Docker #DevOps",
+    "Tìm hiểu cơ chế Garbage Collection trong Java để tối ưu hóa việc giải phóng bộ nhớ RAM. #Java #GC",
+    "Lương ngành IT năm nay có vẻ chững lại, yêu cầu tuyển dụng của các công ty cũng khắt khe hơn nhiều.",
+    "Bàn phím cơ Custom đang là thú chơi tốn kém của cánh lập trình viên, nhưng gõ sướng thì không tiếc tiền. #customkeyboard",
+    "Hệ điều hành Windows 11 ngày càng mượt mà nhưng ngốn RAM khủng khiếp quá, chắc phải nâng cấp lên 32GB thôi.",
+    "AI không thay thế lập trình viên, nhưng lập trình viên biết dùng AI sẽ thay thế những người không biết dùng. #AI #Copilot",
+    "Tìm hiểu kiến trúc Clean Architecture giúp dự án lớn dễ bảo trì và test hơn rất nhiều. #softwaredesign",
+    "AWS vs Google Cloud: Nên chọn nhà cung cấp đám mây nào cho dự án startup của bạn? #AWS #GCP #Cloud",
+    "Cơ chế bất đồng bộ (Async/Await) trong Javascript đôi khi vẫn làm khó các bạn newbie mới học. #javascript #async",
+    "Làm thế nào để bảo vệ website trước các cuộc tấn công SQL Injection và XSS phổ biến? #websecurity #cyber",
+    "Flutter 3.x hỗ trợ đa nền tảng cực tốt, viết code một lần chạy cả iOS, Android lẫn Web. #Flutter #Dart",
+    "Sự trỗi dậy của các mô hình ngôn ngữ lớn (LLM) mã nguồn mở như Llama 3 đang đe dọa vị thế độc tôn của OpenAI. #Llama3 #OpenSource",
+    "Database Indexing: Bí quyết để câu truy vấn tìm kiếm hàng triệu dữ liệu chỉ mất dưới 10ms. #database #indexing",
+    "Review chi tiết chiếc MacBook Air M3, chiếc máy hoàn hảo cho tác vụ văn phòng và code nhẹ nhàng. #MacBookAir",
+    "Học Git và cách quản lý nhánh (branching workflow) là kỹ năng bắt buộc khi làm việc nhóm trong dự án phần mềm. #Git #GitHub",
+    "WebAssembly đang mở ra kỷ nguyên mới cho các ứng dụng web hiệu năng cao trực tiếp trên trình duyệt. #WebAssembly",
+    "Làm remote cho công ty nước ngoài nhận lương USD đang là xu hướng được nhiều dev Việt Nam hướng tới. #remotework #developer"
   ],
   cooking: [
     "Bí quyết để món bò kho mềm tan chính là phải ướp với một chút nước dừa tươi. #cooking #monngon",
@@ -130,7 +175,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Cách chọn thực phẩm sạch và an toàn đi chợ mỗi ngày. #healthyfood",
     "Nấu món ăn chay ngon và đủ chất dinh dưỡng cho cả nhà.",
     "Review các loại lò vi sóng đa năng, hỗ trợ đắc lực cho việc nấu nướng.",
-    "Cách làm nước chấm hải sản thần thánh cân mọi món đồ biển. #seafood"
+    "Cách làm nước chấm hải sản thần thánh cân mọi món đồ biển. #seafood",
+    "Cuối tuần tự tay làm món bún bò Huế thơm lừng cả xóm, nước dùng đậm đà sả ớt chuẩn vị miền Trung. #bunbohue #vietnamesefood",
+    "Mẹo rán cá không bị sát chảo: Hãy rắc một chút muối hạt vào dầu nóng trước khi cho cá vào chiên.",
+    "Tự làm bánh trung thu nhân hạt sen trứng muối ít ngọt, ăn đỡ ngấy và tốt cho sức khỏe. #homebaking",
+    "Cách ngâm mơ đường phèn giải nhiệt cho mùa hè, nước mơ chua chua ngọt ngọt thơm lừng. #drinkrecipe",
+    "Học cách làm nước sốt mè rang béo ngậy để ăn kèm với các món salad giảm cân. #healthyrecipe",
+    "Hôm nay nấu bữa cơm gia đình giản dị: Cá kho tộ, rau muống luộc chấm sấu, cà pháo muối giòn. #vietnamesemeal",
+    "Chia sẻ công thức ướp sườn nướng mật ong mềm mọng nước, nướng bằng nồi chiên không dầu siêu nhàn. #airfryer",
+    "Mẹo khử mùi hôi của thịt bò bằng cách chà xát với gừng đập dập và chút rượu trắng trước khi nấu.",
+    "Cách làm bánh bao nhân thịt xá xíu vỏ mềm xốp, nhân đậm đà thơm phức cho bữa sáng tiện lợi. #breakfast",
+    "Bí quyết pha nước chấm ốc luộc chua cay mặn ngọt chuẩn vị vỉa hè Hà Nội. #streetfood #vietnam",
+    "Nấu cháo sườn sụn nóng hổi cho những ngày mưa gió se lạnh, rắc thêm chút tiêu và hành hoa thơm phức.",
+    "Review chiếc nồi áp suất đa năng, hầm xương nhanh vèo vèo mà không mất chất dinh dưỡng.",
+    "Cách tự làm mỡ hành xanh mướt, không bị thâm để rưới lên các món nướng.",
+    "Công thức nấu chè đậu xanh nha đam thanh mát, giải độc cơ thể cho những ngày hè nắng nóng. #sweetsoup",
+    "Mẹo luộc gà da vàng ruộm, giòn sần sật không bị nứt: Thêm chút nghệ và thả gà vào lúc nước còn lạnh.",
+    "Học làm pizza tại nhà từ bước nhào bột, nướng bằng lò gia đình vẫn ngon không kém ngoài tiệm. #homemadepizza",
+    "Nước mắm tỏi ớt muốn nổi tỏi ớt lên trên thì phải hòa tan đường với chanh trước rồi mới cho tỏi ớt vào sau cùng.",
+    "Bữa sáng dinh dưỡng với bánh mì đen kẹp bơ và trứng chần, nhanh gọn lẹ cho ngày bận rộn. #fitfood",
+    "Cách muối dưa cải chua giòn vàng, nấu canh sườn hay xào lòng mề đều ngon hết sảy.",
+    "Tập làm các món ăn chay thanh tịnh vào ngày rằm, vừa thanh lọc cơ thể vừa ngon miệng."
   ],
   movie: [
     "Vừa xem xong siêu phẩm của Nolan, thực sự cân não và quá ấn tượng về âm thanh. #Nolan #Oppenheimer",
@@ -162,7 +227,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Sự khác biệt giữa phim chiếu rạp và phim trực tuyến trên các nền tảng.",
     "Review phim hành động võ thuật đỉnh cao với những pha đánh đấm thực thụ.",
     "Những bộ phim truyền cảm hứng mạnh mẽ về nghị lực sống.",
-    "Phân tích vai trò của biên tập phim trong việc tạo nhịp điệu cho tác phẩm."
+    "Phân tích vai trò của biên tập phim trong việc tạo nhịp điệu cho tác phẩm.",
+    "Mới cày xong bộ phim tài liệu về vũ trụ trên Netflix, hình ảnh chân thực đến nổi da gà. #Netflix #documentary",
+    "Những tác phẩm điện ảnh của đạo diễn Vương Gia Vệ luôn mang một màu sắc u buồn và đầy tính nghệ thuật. #WongKarWai",
+    "Review phim điện ảnh mới ra rạp: Cốt truyện lôi cuốn, dàn diễn viên gạo cội cứu vớt phần kỹ xảo chưa hoàn thiện.",
+    "Những bộ phim thanh xuân vườn trường Trung Quốc luôn mang lại cảm giác hoài niệm về thời học sinh ngây ngô. #youthdrama",
+    "Tại sao các bộ phim kinh điển như The Shawshank Redemption hay The Godfather vẫn luôn đứng đầu bảng xếp hạng IMDb? #IMDb",
+    "Dòng phim trinh thám hack não của David Fincher luôn khiến người xem phải căng mắt theo dõi từng chi tiết nhỏ. #DavidFincher",
+    "Review bộ phim hoạt hình mới nhất của Pixar, nội dung sâu sắc khiến người lớn cũng phải rơi nước mắt. #Pixar #InsideOut",
+    "Nhạc phim của Hans Zimmer đúng là một đẳng cấp khác, nâng tầm cảm xúc cho cả bộ phim lên gấp nhiều lần. #HansZimmer",
+    "Những cú máy dài (long take) trong phim điện ảnh luôn thể hiện sự kỳ công của cả đạo diễn lẫn ê kíp quay phim.",
+    "Tại sao phim bom tấn Hollywood dạo này lại lạm dụng CGI quá đà làm mất đi tính chân thực của các cảnh hành động?",
+    "Review bộ phim kinh dị giật gân Hàn Quốc đang gây sốt phòng vé, cú twist cuối phim thực sự nổi da gà. #KoreanMovie",
+    "Tầm quan trọng của thiết kế âm thanh (Sound Design) trong việc tạo nên không khí u ám, giật mình cho phim kinh dị.",
+    "Những bộ phim về đề tài du hành thời gian luôn đòi hỏi một kịch bản cực kỳ logic để tránh các lỗi nghịch lý nghịch cảnh.",
+    "Review series phim truyền hình bom tấn viễn tưởng mới ra mắt mùa đầu tiên, đáng xem từng tập! #SciFiSeries",
+    "Cách các biên kịch xây dựng hành trình phát triển tâm lý nhân vật từ phản diện thành chính diện đầy thuyết phục.",
+    "Review bộ phim hài tình cảm lãng mạn nhẹ nhàng, thích hợp để xem cùng người yêu vào tối cuối tuần. #RomCom",
+    "Sự phát triển vượt bậc của kỹ xảo điện ảnh Việt Nam trong những năm gần đây, rất đáng ghi nhận và ủng hộ.",
+    "Những bộ phim độc lập (Indie) thường có ngân sách thấp nhưng lại mang những thông điệp xã hội vô cùng sâu sắc.",
+    "Review phim tài liệu tội phạm có thật (True Crime) gây ám ảnh tột cùng về tâm lý tội phạm.",
+    "Dành cả ngày chủ nhật để cày trọn bộ series trinh thám yêu thích thì còn gì tuyệt vời bằng! #bingewatching"
   ],
   travel: [
     "Đà Lạt mùa này không khí thật trong lành, sáng sớm se lạnh cực thích. #Dalat #Travel",
@@ -194,7 +279,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Những hòn đảo đẹp như thiên đường ở Philippines bạn không nên bỏ lỡ.",
     "Du lịch một mình (Solo Travel): Những trải nghiệm tự do tự tại.",
     "Review các trang trại homestay gần gũi với thiên nhiên tại Mộc Châu.",
-    "Tầm quan trọng của bảo hiểm du lịch trong các chuyến đi dài ngày."
+    "Tầm quan trọng của bảo hiểm du lịch trong các chuyến đi dài ngày.",
+    "Du lịch Tây Bắc mùa lúa chín vàng óng trên các thửa ruộng bậc thang, cảnh đẹp như tranh vẽ. #TâyBắc #VietnamTravel",
+    "Kinh nghiệm du lịch tự túc Bali 5 ngày 4 đêm cực chi tiết cho các cặp đôi. #Bali #Indonesia",
+    "Khám phá hang động kỳ vĩ tại Phong Nha - Kẻ Bàng, di sản thiên nhiên thế giới không thể bỏ qua. #PhongNha",
+    "Review homestay nhỏ xinh nằm sâu trong thung lũng ở Sa Pa, view ngắm mây bay cực chill mỗi sáng. #SapaHomestay",
+    "Mẹo sắp xếp đồ đạc hành lý thông minh giúp bạn đi du lịch cả tuần chỉ với một chiếc balo nhỏ gọn.",
+    "Hành trình săn hoàng hôn trên biển Phú Quốc, ánh mặt trời nhuộm đỏ cả góc trời đẹp mê hồn. #sunset #phuquocisland",
+    "Review ẩm thực đường phố Đà Nẵng: Bánh xèo, nem lụi, mì Quảng ngon bổ rẻ ăn quên lối về. #DanangFood",
+    "Kinh nghiệm phượt xe máy cung đường đèo Mã Pí Lèng Hà Giang đầy thử thách và mê hoặc. #MaPiLeng #phượt",
+    "Những bãi biển hoang sơ, cát trắng nắng vàng chưa bị thương mại hóa ở Bình Thuận bạn nên đi ngay.",
+    "Cách săn vé máy bay giá rẻ vào các khung giờ vàng khuyến mãi của các hãng hàng không.",
+    "Du lịch chữa lành (Wellness Travel): Xu hướng nghỉ dưỡng kết hợp thiền và yoga đang lên ngôi.",
+    "Review khách sạn boutique phong cách Đông Dương (Indochine) cổ kính giữa lòng phố cổ Hà Nội. #HanoiOldQuarter",
+    "Những điều cần chuẩn bị khi đi trekking rừng quốc gia để đảm bảo an toàn tuyệt đối.",
+    "Khám phá văn hóa ẩm thực độc đáo của miền Tây sông nước với các món ăn dân dã, ngọt ngào. #MienTay",
+    "Kinh nghiệm du lịch châu Âu tự túc qua các nước Pháp, Đức, Ý bằng tàu hỏa siêu tiện lợi.",
+    "Review khu cắm trại cao cấp (Glamping) bên bờ hồ Đại Lải, trải nghiệm hòa mình vào thiên nhiên.",
+    "Cách bảo vệ làn da và sức khỏe khi đi du lịch ở các vùng khí hậu nắng nóng khắc nghiệt.",
+    "Hành trình khám phá cố đô Huế trầm mặc, cổ kính với các lăng tẩm và cung điện uy nghiêm. #HueCitadel",
+    "Những ứng dụng bản đồ offline hữu ích giúp bạn không bị lạc đường khi đi du lịch nước ngoài.",
+    "Du lịch bụi (Backpacking) qua các nước Đông Nam Á: Trải nghiệm tự do và kết bạn quốc tế."
   ],
   music: [
     "Giai điệu của bài hát này thực sự rất chill, nghe vào buổi sáng rất hợp. #music #chill",
@@ -226,7 +331,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Những nhạc sĩ có khả năng sáng tác và tự trình bày xuất sắc nhất.",
     "Khám phá các dòng nhạc Rock với sức mạnh năng lượng tràn đầy. #Rock",
     "Tầm quan trọng của vũ đạo trong các buổi biểu diễn âm nhạc hiện đại.",
-    "Review các trang web học chơi nhạc cụ trực tuyến hiệu quả nhất."
+    "Review các trang web học chơi nhạc cụ trực tuyến hiệu quả nhất.",
+    "Buổi tối bật list nhạc lofi nhẹ nhàng, nhâm nhi cốc trà nóng và đọc sách thật bình yên. #lofi #relaxing",
+    "Sự trở lại của ca sĩ quốc dân với MV ca nhạc đầu tư tiền tỷ đang chiếm lĩnh top 1 trending YouTube. #trendingmusic",
+    "Review chiếc loa di động chất âm mộc mạc, dải mid ngọt ngào thích hợp nghe nhạc trữ tình. #LoaBluetooth",
+    "Những bản ballad buồn da diết luôn là lựa chọn hàng đầu cho những ngày tâm trạng cô đơn, mưa rơi. #sadballad",
+    "Dòng nhạc Synthwave mang âm hưởng thập niên 80 đang quay trở lại mạnh mẽ trong các sản phẩm âm nhạc hiện đại.",
+    "Review tai nghe chống ồn chủ động (ANC) tốt nhất phân khúc, cách ly hoàn toàn với tiếng ồn đô thị. #ANC",
+    "Âm nhạc dân gian đương đại Việt Nam đang ngày càng có nhiều sản phẩm đột phá, tiếp cận người trẻ.",
+    "Học chơi guitar acoustic cơ bản: Những hợp âm đầu tiên luôn làm đau tay nhưng kiên trì sẽ thành công. #guitar",
+    "Phân tích sức hút của nhạc rap Việt Nam qua các chương trình truyền hình thực tế gần đây. #RapViet",
+    "Tại sao âm thanh từ những chiếc đĩa than cổ vẫn có một sức hút kỳ lạ đối với những người sành nhạc? #vinylrecords",
+    "Review phần mềm thu âm và mix nhạc trên điện thoại cực đơn giản cho các bạn muốn cover nhạc. #homestudio",
+    "Những buổi trình diễn nhạc sống (Live Acoustic) tại các quán cà phê nhỏ luôn mang lại cảm giác mộc mạc, gần gũi.",
+    "Tầm quan trọng của nhạc nền trong các trò chơi điện tử (Video Game OST) giúp nâng tầm trải nghiệm game thủ.",
+    "Review chiếc đàn piano điện nhỏ gọn, phím gõ có độ nặng như đàn cơ, thích hợp cho người mới bắt đầu. #piano",
+    "Những ca khúc nhạc thiếu nhi vui nhộn giúp kích thích tư duy và sự sáng tạo của trẻ nhỏ.",
+    "Phân tích lối viết lời đầy chất thơ và triết lý trong các bài hát của nhạc sĩ Trịnh Công Sơn. #TrinhCongSon",
+    "Tại sao xu hướng nghe nhạc qua các nền tảng streaming (Spotify, Apple Music) lại phát triển vượt bậc?",
+    "Review show diễn ca nhạc ngoài trời giữa rừng thông Đà Lạt, trải nghiệm âm nhạc tuyệt vời dưới cái lạnh se se.",
+    "Cách tự luyện thanh nhạc cơ bản tại nhà để cải thiện hơi thở và cột hơi khi hát. #vocalpractice",
+    "Âm nhạc điện tử (EDM) với những nhịp drop căng cực luôn là năng lượng không thể thiếu trong các bữa tiệc. #EDM"
   ],
   finance: [
     "Thị trường chứng khoán hôm nay có biến động mạnh, cần cẩn trọng khi giải ngân. #stocks #finance",
@@ -258,7 +383,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Làm sao để xây dựng điểm tín dụng tốt cho các nhu cầu vay vốn sau này?",
     "Review các dòng thẻ ngân hàng có nhiều ưu đãi hoàn tiền và dặm bay.",
     "Tương lai của tài chính phi tập trung (DeFi) và những thách thức mới.",
-    "Cách đàm phán lương và quyền lợi khi thay đổi công việc mới."
+    "Cách đàm phán lương và quyền lợi khi thay đổi công việc mới.",
+    "Bắt đầu tích lũy đầu tư từ những số tiền nhỏ nhất, kỷ luật sẽ tạo nên sự khác biệt sau 5-10 năm. #personalfinance",
+    "Quy tắc 6 chiếc lọ quản lý tài chính cá nhân giúp bạn phân bổ nguồn tiền hợp lý và thông minh. #sixjars",
+    "Review các kênh đầu tư tài chính phổ biến tại Việt Nam hiện nay cho người có vốn nhàn rỗi ít. #investment",
+    "Đừng bỏ toàn bộ trứng vào một giỏ - nguyên tắc vàng trong đầu tư để giảm thiểu rủi ro thua lỗ.",
+    "Tìm hiểu về quỹ mở và cách đầu tư quỹ mở định kỳ hàng tháng tự động qua app ngân hàng.",
+    "Những thói quen chi tiêu mua sắm bốc đồng khiến ví tiền của bạn luôn trong tình trạng báo động. #savingmoney",
+    "Làm sao để xây dựng nguồn thu nhập thứ hai từ công việc Freelance bên cạnh công việc chính 8 tiếng?",
+    "Sức mạnh khủng khiếp của lãi kép: Ví dụ thực tế nếu bạn tiết kiệm 2 triệu mỗi tháng từ năm 22 tuổi. #compoundinterest",
+    "Review các dòng thẻ tín dụng tích lũy dặm bay tốt nhất cho những người thường xuyên đi du lịch.",
+    "Tìm hiểu kinh tế vĩ mô: Lãi suất ngân hàng giảm ảnh hưởng như thế nào đến thị trường chứng khoán và bất động sản?",
+    "Cách thiết lập mục tiêu tự do tài chính (FIRE) và kế hoạch nghỉ hưu sớm trước tuổi 40. #FIREmovement",
+    "Review các cuốn sách kinh định về tư duy tiền bạc và làm giàu bạn nhất định phải đọc một lần. #books",
+    "Những chiêu trò lừa đảo đầu tư tài chính cam kết lãi suất cao ngất ngưởng trên mạng xã hội cần cảnh giác.",
+    "Làm sao để đàm phán tăng lương thành công trong buổi review hiệu suất công việc cuối năm?",
+    "Tầm quan trọng của việc mua bảo hiểm sức khỏe cho bản thân và gia đình trước khi nghĩ đến chuyện đầu tư mạo hiểm.",
+    "Review phần mềm quản lý tài chính doanh nghiệp nhỏ giúp kiểm soát dòng tiền thu chi rõ ràng.",
+    "Cách lập ngân sách chi tiêu gia đình hàng tháng để không rơi vào cảnh đầu tháng sang chảnh cuối tháng ăn mì.",
+    "Đầu tư bất động sản vùng ven: Những lưu ý quan trọng về pháp lý và quy hoạch bạn cần biết.",
+    "Tại sao việc ghi chép lại mọi khoản chi tiêu dù là nhỏ nhất lại giúp bạn tiết kiệm được rất nhiều tiền?",
+    "Tìm hiểu về thị trường trái phiếu doanh nghiệp và những rủi ro đi kèm khi mua trái phiếu lãi suất cao."
   ],
   health: [
     "Uống đủ nước mỗi ngày giúp làn da luôn căng mọng và cơ thể tràn đầy năng lượng. #health #skincare",
@@ -290,7 +435,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Cách giảm cân an toàn và khoa học không gây mệt mỏi cho cơ thể.",
     "Review các loại thảm tập Yoga êm ái và có độ bám tốt.",
     "Tại sao việc hít thở đúng cách lại cực kỳ quan trọng đối với sức khỏe?",
-    "Cách duy trì lối sống lành mạnh cho cả gia đình trong kỷ nguyên hiện đại."
+    "Cách duy trì lối sống lành mạnh cho cả gia đình trong kỷ nguyên hiện đại.",
+    "Thói quen uống nước ấm vào mỗi buổi sáng sau khi thức dậy cực kỳ tốt cho hệ tiêu hóa và làn da. #healthylifestyle",
+    "Review chế độ ăn Eat Clean sau 3 tháng: Cơ thể nhẹ nhàng hơn, da dẻ mịn màng và tràn đầy năng lượng. #eatclean",
+    "Những bài tập giãn cơ đơn giản ngay tại bàn làm việc giúp đẩy lùi chứng đau mỏi vai gáy của dân văn phòng.",
+    "Tầm quan trọng của việc thải độc cơ thể tự nhiên bằng cách hạn chế đồ ăn dầu mỡ, nhiều đường.",
+    "Review thảm tập yoga định tuyến chất liệu cao su tự nhiên, chống trơn trượt cực tốt cho người ra nhiều mồ hôi. #yoga",
+    "Cách xây dựng một chu trình dưỡng da (skincare routine) tối giản nhưng mang lại hiệu quả tối đa cho da mụn. #skincare",
+    "Tập luyện Cardio tại nhà 20 phút mỗi ngày giúp đốt cháy calo hiệu quả và tăng cường sức khỏe tim mạch. #cardio",
+    "Tại sao việc kiểm soát căng thẳng (stress management) lại quan trọng tương đương với chế độ ăn uống và tập luyện?",
+    "Review chiếc máy tăm nước cầm tay giúp làm sạch sâu kẽ răng, bảo vệ nướu lợi vô cùng hiệu quả. #dentalcare",
+    "Những thực phẩm giàu protein thực vật tuyệt vời dành cho người ăn chay hoặc đang giảm cân.",
+    "Cách cải thiện chất lượng giấc ngủ: Tắt mọi thiết bị điện tử trước khi ngủ 1 tiếng và giữ phòng tối mát.",
+    "Review dòng sữa hạt tự nhiên ít đường, nguồn bổ sung dinh dưỡng lành mạnh cho cả gia đình.",
+    "Tầm quan trọng của việc duy trì tư thế ngồi thẳng lưng khi làm việc để tránh thoái hóa cột sống.",
+    "Lợi ích tuyệt vời của việc tắm nắng sáng sớm 10-15 phút để bổ sung Vitamin D tự nhiên cho cơ thể.",
+    "Cách phòng ngừa và điều trị cảm cúm hiệu quả bằng các bài thuốc dân gian lành tính tại nhà.",
+    "Review ứng dụng theo dõi calo tiêu thụ và lượng nước uống hàng ngày cực kỳ tiện lợi trên điện thoại.",
+    "Những thói quen ăn uống lành mạnh giúp ngăn ngừa nguy cơ mắc các bệnh về đường huyết và tim mạch.",
+    "Tại sao việc hít thở sâu bằng bụng lại giúp làm dịu hệ thần kinh và giảm nhịp tim hiệu quả?",
+    "Review các loại trà thảo mộc tự nhiên giúp thanh nhiệt, mát gan và hỗ trợ ngủ ngon giấc.",
+    "Hãy lắng nghe cơ thể của bạn và dành thời gian nghỉ ngơi hợp lý khi cảm thấy quá tải."
   ],
   astronomy: [
     "Kính thiên văn Hubble vừa gửi về những hình ảnh tuyệt đẹp về các thiên hà xa xôi. #Astronomy #Hubble",
@@ -317,7 +482,27 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Cách chụp ảnh thiên văn (Astrophotography) cực đẹp bằng máy ảnh DSLR.",
     "Những khám phá mới nhất về nguồn gốc của hệ mặt trời chúng ta.",
     "Tầm quan trọng của việc bảo vệ bầu trời đêm khỏi ô nhiễm ánh sáng đô thị.",
-    "Vũ trụ song song: Liệu có tồn tại những thế giới khác ngoài vũ trụ này?"
+    "Vũ trụ song song: Liệu có tồn tại những thế giới khác ngoài vũ trụ này?",
+    "Bức ảnh chụp lỗ đen siêu khối lượng tại trung tâm thiên hà của chúng ta thực sự là một kỳ tích của nhân loại. #BlackHole #Science",
+    "Trạm vũ trụ quốc tế ISS vừa chia sẻ video quay cảnh bình minh nhìn từ quỹ đạo trái đất đẹp đến nghẹt thở. #ISS #Space",
+    "Tìm hiểu thuyết vụ nổ lớn (Big Bang) - điểm khởi nguồn của toàn bộ không thời gian và vật chất trong vũ trụ. #BigBang",
+    "Review chiếc kính thiên văn phản xạ tầm trung giúp bạn quan sát rõ nét vành đai sao Thổ và các mặt trăng của sao Mộc. #Astronomy",
+    "Hành trình thám hiểm của robot tự hành Curiosity trên bề mặt sao Hỏa mang lại nhiều phát hiện chấn động. #MarsMission",
+    "Tại sao bầu trời đêm lại có màu đen mặc dù vũ trụ có hàng tỷ tỷ ngôi sao đang tỏa sáng? Nghịch lý Olbers.",
+    "Khám phá dải Ngân hà (Milky Way): Hệ mặt trời của chúng ta chỉ là một hạt cát nhỏ bé trong thiên hà này. #MilkyWay",
+    "Mưa sao băng Quadrantids sẽ xuất hiện trên bầu trời đêm nay với tần suất lên tới 120 vệt sao băng mỗi giờ. #shootingstar",
+    "Vật chất tối (Dark Matter) và Năng lượng tối (Dark Energy) - hai bí ẩn lớn nhất chiếm tới 95% thành phần vũ trụ.",
+    "Tìm hiểu về các pulsar và magnetar - những ngôi sao neutron có từ trường siêu khủng khiếp trong vũ trụ.",
+    "Sự sống ngoài hành tinh: Liệu đại dương băng giá dưới bề mặt mặt trăng Europa của sao Mộc có chứa sự sống?",
+    "Review ứng dụng bản đồ sao 3D giúp bạn dễ dàng nhận biết các chòm sao trên bầu trời bằng camera điện thoại.",
+    "Hiện tượng nhật thực hình khuyên (vòng lửa) tuyệt đẹp vừa diễn ra tại khu vực Thái Bình Dương. #SolarEclipse",
+    "Cách các nhà khoa học sử dụng hiệu ứng Doppler để phát hiện các hành tinh ngoài hệ mặt trời đang quay quanh sao mẹ.",
+    "Vòng đời của một ngôi sao: Từ đám mây bụi tinh vân đến vụ nổ siêu tân tinh hoành tráng hoặc sụp đổ thành sao lùn.",
+    "Review cuốn sách 'Vũ trụ trong vỏ hạt dẻ' của Stephen Hawking dành cho những ai đam mê vật lý lý thuyết. #StephenHawking",
+    "Hiện tượng ô nhiễm ánh sáng đô thị đang khiến thế hệ trẻ mất đi cơ hội ngắm nhìn dải Ngân hà bằng mắt thường.",
+    "Thuyết đa vũ trụ (Multiverse): Liệu có tồn tại những phiên bản khác của chúng ta ở các vũ trụ song song?",
+    "Kính viễn vọng không gian James Webb tiếp tục phát hiện ra các thiên hà cổ xưa nhất được hình thành sau Big Bang. #JWST",
+    "Khám phá những vùng không gian trống rỗng khổng lồ (Supervoids) nơi hầu như không có thiên hà nào tồn tại."
   ],
   comments: [
     "Bài viết thực sự rất hữu ích, cảm ơn bạn đã chia sẻ!",
@@ -354,7 +539,22 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Bài này đỉnh thật sự.",
     "Rất đáng để suy ngẫm.",
     "Tuyệt vời ông mặt trời!",
-    "Sẽ ủng hộ bạn dài dài."
+    "Sẽ ủng hộ bạn dài dài.",
+    "Góc nhìn rất thực tế, bài viết này xứng đáng được chia sẻ rộng rãi!",
+    "Đọc xong thấy có động lực học tập và làm việc hẳn lên.",
+    "Mình đã áp dụng và thành công, cảm ơn chia sẻ của bạn nhiều nhé.",
+    "Thông tin rất kịp thời và bổ ích cho mình lúc này.",
+    "Rất mong chờ các bài viết tiếp theo của tác giả về chủ đề này.",
+    "Ý kiến của bạn rất độc đáo, mình chưa từng nghĩ tới khía cạnh đó.",
+    "Bài viết được đầu tư hình ảnh và nội dung rất chỉn chu.",
+    "Có cách nào liên hệ trực tiếp với bạn để trao đổi thêm không?",
+    "Lưu lại ngay để khi cần có cái lôi ra đọc lại liền.",
+    "Ủng hộ tác giả 1 like và 1 share vì bài viết quá chất lượng.",
+    "Nội dung ngắn gọn, súc tích, đi thẳng vào vấn đề.",
+    "Rất đồng cảm với những gì bạn đã chia sẻ trong bài.",
+    "Một bài phân tích hiếm hoi có chiều sâu trên nền tảng này.",
+    "Cho mình xin phép được re-up lại bài viết này lên blog cá nhân nhé.",
+    "Cực kỳ thuyết phục, không có điểm nào để chê."
   ],
   quotes: [
     "Một góc nhìn bổ sung rất hay cho bài viết gốc.",
@@ -364,7 +564,22 @@ const CONTENT_LIBRARY: Record<Topic | 'comments' | 'quotes', string[]> = {
     "Bài viết này làm mình nhớ đến một trải nghiệm tương tự.",
     "Rất đồng tình với tác giả, đặc biệt là phần kết luận.",
     "Nội dung quá xuất sắc, không thể không chia sẻ lại.",
-    "Một ví dụ điển hình cho thấy tầm quan trọng của chủ đề này."
+    "Một ví dụ điển hình cho thấy tầm quan trọng của chủ đề này.",
+    "Một bài viết quá hay về chủ đề này, chia sẻ lại để lưu trữ ngay.",
+    "Đọc bài này xong mình vỡ lẽ ra được nhiều điều, highly recommend!",
+    "Đây chính xác là những gì mình muốn nói bấy lâu nay.",
+    "Thêm một góc nhìn cực kỳ sâu sắc mà ai cũng nên tham khảo.",
+    "Chia sẻ lại cho bạn bè cùng đọc, bài viết rất thực tế.",
+    "Rất đồng tình với luận điểm thứ hai của tác giả.",
+    "Một kiến thức vô cùng bổ ích cho các bạn đang bắt đầu học tập.",
+    "Bài viết này phân tích rất khách quan và khoa học.",
+    "Không thể đồng ý hơn với những chia sẻ trong bài viết này.",
+    "Lưu lại để làm tài liệu tham khảo cho dự án sắp tới.",
+    "Đọc và suy ngẫm, bài viết mang lại rất nhiều giá trị.",
+    "Chia sẻ lại bài viết chất lượng này từ một tác giả có tâm.",
+    "Mọi người nên đọc bài viết gốc để hiểu rõ hơn vấn đề nhé.",
+    "Quá chuẩn xác, chia sẻ ngay không cần suy nghĩ.",
+    "Một đóng góp rất tuyệt vời của tác giả dành cho cộng đồng."
   ]
 }
 
@@ -555,18 +770,24 @@ async function main() {
   const bgUsers: ObjectId[] = []
   for (let i = 1; i <= 20; i++) bgUsers.push(await createUser(`bg_${i}`))
 
-  console.log('[seed] Generating 220 posts with hashtags & vectors...')
+  // LƯU Ý: chủ đề 'astronomy' (index 8) KHÔNG nằm trong pool chính.
+  // Astronomy được tạo riêng ở phần Hybrid Fallback bên dưới (niche topic).
+  const MAIN_TOPICS = TOPICS.slice(0, 8)
+  const totalMainPosts = MAIN_TOPICS.reduce((sum, topic) => sum + CONTENT_LIBRARY[topic].length, 0)
+  console.log(`[seed] Generating ${totalMainPosts} posts with hashtags & vectors...`)
   const twizzDocs: Twizz[] = []
   const twizzPool: Array<{ _id: ObjectId, topic: Topic }> = []
 
-  // LƯU Ý: i % 8 (không phải % 9) → chủ đề 'astronomy' (index 8) KHÔNG nằm trong pool chính.
-  // Astronomy được tạo riêng ở phần Hybrid Fallback bên dưới (niche topic).
-  for (let i = 0; i < 220; i++) {
-    const topic = TOPICS[i % 8]
-    const authorId = bgUsers[i % bgUsers.length]
-    const twizz = await createTwizz(authorId, topic)
-    twizzDocs.push(twizz)
-    twizzPool.push({ _id: twizz._id as ObjectId, topic })
+  let authorIndex = 0
+  for (const topic of MAIN_TOPICS) {
+    const count = CONTENT_LIBRARY[topic].length
+    for (let i = 0; i < count; i++) {
+      const authorId = bgUsers[authorIndex % bgUsers.length]
+      const twizz = await createTwizz(authorId, topic)
+      twizzDocs.push(twizz)
+      twizzPool.push({ _id: twizz._id as ObjectId, topic })
+      authorIndex++
+    }
   }
   await databaseService.twizzs.insertMany(twizzDocs)
 
@@ -642,7 +863,8 @@ async function main() {
   console.log('[seed] Creating niche pool (Astronomy)...')
   const nicheAuthor = bgUsers[bgUsers.length - 1]
   const nicheDocs: Twizz[] = []
-  for (let i = 0; i < 25; i++) {
+  const astronomyCount = CONTENT_LIBRARY.astronomy.length
+  for (let i = 0; i < astronomyCount; i++) {
     const t = await createTwizz(nicheAuthor, 'astronomy', randomDateInPast(5))
     nicheDocs.push(t)
     if (i < 15) {
