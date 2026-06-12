@@ -30,10 +30,10 @@ const MAX_WEIGHT_CAP = 100.0
 const RECALCULATE_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000
 
 // Giới hạn dưới của hệ số thời gian (Time Decay Floor) để bài cũ chất lượng không bị bài mới không liên quan đè bẹp
-const DECAY_FLOOR = 0.7
+const DECAY_FLOOR = 0.6
 
 // Ngưỡng tương đồng tối thiểu để lọc ra những bài viết thực sự liên quan đến sở thích
-const MIN_SIMILARITY_THRESHOLD = 0.7
+const MIN_SIMILARITY_THRESHOLD = 0.6
 
 class ContentBasedService {
   constructor() {
@@ -90,7 +90,7 @@ class ContentBasedService {
           index: 'vector_index',
           path: 'content_vector',
           queryVector: userVector,
-          numCandidates: limit * 10,
+          numCandidates: (limit * 4) * 20, // Đảm bảo tỷ lệ 20x so với limit thực tế (limit * 4)
           limit: limit * 4,
           filter: {
             _id: { $nin: excludeIds },

@@ -1061,19 +1061,19 @@ class RecommendationService {
 
     await databaseService.recommendationViews.bulkWrite(operations, { ordered: false })
 
-    // Tỉa cache trực tiếp: Loại bỏ bài vừa xem khỏi Pool hiện tại
-    const cached = this.scoredCache.get(userId)
-    if (cached) {
-      const viewedSet = new Set(twizzIds)
-      const originalLength = cached.items.length
-      cached.items = cached.items.filter((item) => !viewedSet.has(item.twizz_id.toString()))
+    // // Tỉa cache trực tiếp: Loại bỏ bài vừa xem khỏi Pool hiện tại
+    // const cached = this.scoredCache.get(userId)
+    // if (cached) {
+    //   const viewedSet = new Set(twizzIds)
+    //   const originalLength = cached.items.length
+    //   cached.items = cached.items.filter((item) => !viewedSet.has(item.twizz_id.toString()))
 
-      recoLog('Orchestrator', 'Đã tỉa Cache sau khi user xem bài', {
-        userId,
-        bàiTrongCacheTrướcĐó: originalLength,
-        bàiTrongCacheSauĐó: cached.items.length
-      })
-    }
+    //   recoLog('Orchestrator', 'Đã tỉa Cache sau khi user xem bài', {
+    //     userId,
+    //     bàiTrongCacheTrướcĐó: originalLength,
+    //     bàiTrongCacheSauĐó: cached.items.length
+    //   })
+    // }
 
     recoLog('Orchestrator', 'markTwizzsAsViewed', {
       userId,
