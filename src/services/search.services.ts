@@ -22,9 +22,15 @@ class SearchService {
     const $match: any = {
       type: { $ne: TwizzType.Comment }
     }
+    // Nếu nội dung tìm kiếm rỗng, chỉ tìm các bài viết có content trống
     if (content.trim() === '') {
       $match.content = ''
     } else {
+      // Cơ chế Text Search ($text) của MongoDB:
+      // - Sử dụng chỉ mục văn bản (Text Index) đã được đánh trên trường 'content' của collection.
+      // - Ưu điểm: Tối ưu cho việc tìm kiếm từ khóa, tự động loại bỏ từ dừng (stop words - e.g. "và", "hoặc"),
+      //   hỗ trợ tách từ (tokenization) và tìm kiếm thông minh hơn (ví dụ: tìm "học lập trình" sẽ khớp cả "học" hoặc "lập trình").
+      // - Hiệu năng: Nhanh hơn Regex rất nhiều trên tập dữ liệu lớn vì sử dụng cấu trúc chỉ mục đảo ngược (inverted index).
       $match.$text = { $search: content }
     }
     if (media_type) {
@@ -460,13 +466,19 @@ class SearchService {
   }) {
     const $match: any = {}
 
-    // Build search query based on field
+    // Cơ chế Regular Expression (Regex) trong MongoDB:
+    // - Sử dụng biểu thức chính quy để tìm kiếm chuỗi khớp một phần (partial match) trong database.
+    // - Option 'i' (case-insensitive) giúp tìm kiếm không phân biệt chữ hoa, chữ thường.
+    // - Nhược điểm: Hiệu năng kém hơn trên tập dữ liệu lớn do không sử dụng được index thông thường một cách tối ưu
+    //   (phải quét toàn bộ collection - Collscan - nếu không có index đặc thù).
     if (field === 'username') {
+      // Tìm kiếm người dùng có username chứa chuỗi tìm kiếm (ví dụ: "son" khớp "nguyentrungson")
       $match.username = { $regex: content, $options: 'i' }
     } else if (field === 'name') {
+      // Tìm kiếm người dùng có tên chứa chuỗi tìm kiếm
       $match.name = { $regex: content, $options: 'i' }
     } else {
-      // Search in both username and name if field not specified
+      // Nếu không chọn trường cụ thể, tìm kiếm khớp một phần trên cả username HOẶC name
       $match.$or = [{ username: { $regex: content, $options: 'i' } }, { name: { $regex: content, $options: 'i' } }]
     }
 

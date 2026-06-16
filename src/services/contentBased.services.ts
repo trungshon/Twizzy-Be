@@ -33,7 +33,7 @@ const RECALCULATE_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000
 const DECAY_FLOOR = 0.6
 
 // Ngưỡng tương đồng tối thiểu để lọc ra những bài viết thực sự liên quan đến sở thích
-const MIN_SIMILARITY_THRESHOLD = 0.6
+const MIN_SIMILARITY_THRESHOLD = 0.7
 
 class ContentBasedService {
   constructor() {
